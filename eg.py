@@ -7,11 +7,7 @@ from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 
 import imageio
-# import visvis as vv
-
-im = imageio.imread('../andrea-del-castagno_crucifixion-and-saints.jpg')
-# vv.imshow(im)
-print(im)
+# x = load_img(join(DATA_PATH,folder,file),target_size=(224,224))
 print('Printing one from IDB...')
 im2 = imageio.imread('../IDB-115-072827_fullsize.jpg')
 print(im2)
