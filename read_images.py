@@ -1,6 +1,7 @@
 import os
 
 class ImageDataGenerator:
+    # preprocessing required for wikipaintings dataset
 
     def enumerate_class_names(name, path):
         # given path to the directory, writes all names of class labels to a file.
@@ -26,6 +27,9 @@ class ImageDataGenerator:
             for file in files:
                 f.write(os.path.abspath(file)+" "+str(lines.index(dir))+"\n")
         f.close()
+
+    def generate_artist_file_system(path):
+        
 
 if __name__ == '__main__':
     path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
