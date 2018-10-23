@@ -28,20 +28,6 @@ class ImageDataGenerator:
                 f.write(os.path.abspath(file)+" "+str(lines.index(dir))+"\n")
         f.close()
 
-#for index, item in enumerate(my_list):
-#    print index, item
-
-#If you only need the indices, you can use range():
-
-#for i in range(len(my_list)):
-#    print i
-from distutils.dir_util import copy_tree
-
-# copy subdirectory example
-fromDirectory = "/a/b/c"
-toDirectory = "/x/y/z"
-
-copy_tree(fromDirectory, toDirectory)
 
     def generate_artist_file_system(path, dest_path):
         if os.path.exists(dest_path):
