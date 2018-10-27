@@ -1,5 +1,5 @@
 rasta/data
-rasta-master/data
 lib
 lib64
 include
+cleaning/inception_*

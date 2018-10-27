@@ -1,16 +1,12 @@
 
 from keras.datasets import fashion_mnist #cifar10
 (train_X, train_Y), (test_X, test_Y) = fashion_mnist.load_data()
-
+print(type(train_X), type(train_Y))
 import numpy as np
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
-
+from keras.preprocessing.image import load_img
 import imageio
-# x = load_img(join(DATA_PATH,folder,file),target_size=(224,224))
-print('Printing one from IDB...')
-im2 = imageio.imread('../IDB-115-072827_fullsize.jpg')
-print(im2)
 
 print('Training data shape : ', train_X.shape, train_Y.shape)
 print('Testing data shape : ', test_X.shape, test_Y.shape)
@@ -22,7 +18,7 @@ classes = np.unique(train_Y)
 nClasses = len(classes)
 print('Total number of outputs : ', nClasses)
 print('Output classes : ', classes)
-
+"""
 plt.figure(figsize=[5,5])
 
 # Given a grayscale image, reshape the image to matrix of size 28 x 28 x 1 to feed into the network for RGB ones there is no need to do this step (i think)
@@ -99,4 +95,4 @@ test_eval = fashion_model.evaluate(test_X, test_Y_one_hot, verbose=0)
 print('Test loss:', test_eval[0])
 print('Test accuracy:', test_eval[1])
 
-fashion_model.save("fashion_model_alexnetlike.h5py")
+fashion_model.save("fashion_model_alexnetlike.h5py")"""
