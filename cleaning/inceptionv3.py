@@ -25,8 +25,8 @@ def wp_preprocess_input(x):
     return x
 _NUM_CLASSES = 25
 _BATCH_SIZE = 25
-_PATH = "../rasta/data/wikipaintings_full/wikipaintings_train"
-_VAL_PATH = "../rasta/data/wikipaintings_full/wikipaintings_val"
+_PATH = "../wikipaintings_small/wikipaintings_train"#"../rasta/data/wikipaintings_full/wikipaintings_train"
+_VAL_PATH = "../wikipaintings_small/wikipaintings_val"#"../rasta/data/wikipaintings_full/wikipaintings_val"
 def tfdata_generator(images, labels, is_training, batch_size=_BATCH_SIZE):
   '''Construct a data generator using `tf.Dataset`. '''
 
@@ -40,7 +40,7 @@ def tfdata_generator(images, labels, is_training, batch_size=_BATCH_SIZE):
   dataset = tf.data.Dataset.from_tensor_slices((images, labels))
 
   if is_training:
-    dataset = dataset.shuffle(1000)  # depends on sample size
+    dataset = dataset.shuffle(_BATCH_SIZE)  # depends on sample size
     dataset = dataset.apply(tf.contrib.data.map_and_batch(
         preprocess_fn, batch_size,
         num_parallel_batches=4,  # cpu cores

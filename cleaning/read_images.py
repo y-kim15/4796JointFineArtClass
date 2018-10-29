@@ -3,28 +3,14 @@ from os.path import dirname, abspath
 import pandas
 from clean_csv import Clean
 import imageio
-from keras.preprocessing.image import load_img
+from tensorflow.keras.preprocessing.image import load_img, ImageDataGenerator
 _NUM_SAMPLES = 1000
 
 
-def get_input_data(file_path):
-    # assume file has form id, path, label
-    df = pandas.read_csv(file_path)
-    new_df = pandas.DataFrame(columns = ["images"])
-    new_label = pandas.DataFrame(columns = ["label"])
-    i = 0
-    for index, row in df.iterrows():
-        im = load_img(row["path"], target_size=(224,224))
-        print(type(im))
-        im = imageio.imread(row["path"])
-        print(type(im))
-        new_df.loc[i] = im
-        new_label.loc[i] = row["label"]
-        i += 1
-        break
-        #new_df = new_df.append(pandas.Series([im], index = str(row["id"])))
-        #new_label = new_label.append(pandas.Series([row["label"]], index = str(row["id"])))
-    return (new_df.values, new_label.values)
+def get_generator(data_path):
+    # data_path: path to the parent dir containing all class upper_dirs
+    datagen =
+
 
 
 def get_image_matrix(file_path, id, col_name):
