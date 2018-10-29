@@ -90,10 +90,10 @@ def generate_artist_file_system(path, dest_path):
 
 
 if __name__ == '__main__':
-    #path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
-    path = "../wikipaintings_small/wikipaintings_train"
+    path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
+    #path = "../wikipaintings_small/wikipaintings_train"
     name = "../data/wikipaintings_class_labels_small.txt"
-    enumerate_class_names(name,path)
+    #enumerate_class_names(name,path)
     data_file_name = "../data/train_data_small.txt"
     generate_image_id_file(data_file_name, path, name)
     x, y = get_input_data(data_file_name)

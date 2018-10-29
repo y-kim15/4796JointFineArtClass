@@ -24,9 +24,9 @@ def wp_preprocess_input(x):
 
     return x
 _NUM_CLASSES = 25
-_BATCH_SIZE = 25
-_PATH = "../wikipaintings_small/wikipaintings_train"#"../rasta/data/wikipaintings_full/wikipaintings_train"
-_VAL_PATH = "../wikipaintings_small/wikipaintings_val"#"../rasta/data/wikipaintings_full/wikipaintings_val"
+_BATCH_SIZE = 100
+_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"#"../data/wikipaintings_small/wikipaintings_train"
+_VAL_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"#"../data/wikipaintings_small/wikipaintings_val"
 def tfdata_generator(images, labels, is_training, batch_size=_BATCH_SIZE):
   '''Construct a data generator using `tf.Dataset`. '''
 
@@ -99,7 +99,7 @@ model.fit_generator(
         epochs=20)
 #model.fit(training_set.make_one_shot_iterator(), steps_per_epoch = len(x_train)//_BATCH_SIZE, epochs=5, validation_data=testing_set.make_one_shot_iterator(),
 #validation_steps=len(x_test) // _BATCH_SIZE, verbose=1)
-#model.save("inception_v3_wp_small.h5py")
+model.save("inception_v3_wp_full.h5py")
 """
 # at this point, the top layers are well trained and we can start fine-tuning
 # convolutional layers from inception V3. We will freeze the bottom N layers
@@ -131,4 +131,4 @@ model.fit_generator(
         validation_data=validation_generator,
         validation_steps=count_files(_VAL_PATH)//_BATCH_SIZE
 )
-model.save("inception_v3_wp_small_50layers.h5py")
+model.save("inception_v3_wp_full_50layers.h5py")
