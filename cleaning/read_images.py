@@ -35,16 +35,20 @@ def enumerate_class_names(name, path):
         i += 1
     f.close()
 
-def generate_image_id_file(name, path, class_file_path):
+def generate_image_id_file(name, path, class_file_path, id=True):
     # class_file_path: path where class label file is
     # path: path of parent directory containing all data (e.g. wikipaintings_train)
     # name: path of output file
     # generates file with list of absolute path of images with its class label as csv with code included
     # class label order indexed from 0 determined from class_label.txt file generated
+    # print id by default, set as True
 
     class_f = open(class_file_path, "r")
     lines = class_f.read().split('\n')
-    headers = ["id", "path", "label", "class_name"]
+    if not id :
+        headers = ["path", "label"]
+    else:
+        headers = ["id", "path", "label", "class_name"]
     new_f = pandas.DataFrame(columns = headers)
 
     dirs = sorted(os.listdir(path))
@@ -52,8 +56,11 @@ def generate_image_id_file(name, path, class_file_path):
     for dir in dirs:
         files = sorted(os.listdir(os.path.join(path, dir)))
         for file in files:
-            file_path = os.path.join("..","wikipaintings_small", "wikipaintings_train", dir, file)
-            new_f.loc[i] = ["NaN", file_path, str(lines.index(dir)), str(dir)]
+            file_path = os.path.join("..", "rasta", "data", "wikipaintings_full", "wikipaintings_train", dir, file)
+            if not id:
+                new_f.loc[file_path, str(lines.index(dir))]
+            else:
+                new_f.loc[i] = ["NaN", file_path, str(lines.index(dir)), str(dir)]
             i += 1
 
     new_f = Clean.assign_id(new_f, "label")
@@ -94,7 +101,7 @@ if __name__ == '__main__':
     print(x.shape, y.shape)
     #path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     #val_file_name = "val.txt"
-    #generate_load_image_file(val_file_name, path_val, name)
+    #generate_image_id_file(val_file_name, path_val, name)
     #path = "./wikipaintings_small"
     #dest_path = "./data/wikipaintings_artist"
 
