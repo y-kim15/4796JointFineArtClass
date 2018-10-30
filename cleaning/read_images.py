@@ -1,6 +1,8 @@
 import shutil, os
+import random
 from os.path import dirname, abspath
 import pandas
+import csv
 from clean_csv import Clean
 import imageio
 from tensorflow.keras.preprocessing.image import load_img, ImageDataGenerator
@@ -9,7 +11,7 @@ _NUM_SAMPLES = 1000
 
 def get_generator(data_path):
     # data_path: path to the parent dir containing all class upper_dirs
-    datagen =
+    return
 
 
 
@@ -55,16 +57,28 @@ def generate_image_id_file(name, path, class_file_path, id=True):
     i = 0
     for dir in dirs:
         files = sorted(os.listdir(os.path.join(path, dir)))
+        print("In Directory: ", str(dir))
         for file in files:
             file_path = os.path.join("..", "rasta", "data", "wikipaintings_full", "wikipaintings_train", dir, file)
             if not id:
-                new_f.loc[file_path, str(lines.index(dir))]
+                new_f.loc[i] = [file_path, str(lines.index(dir))]
             else:
                 new_f.loc[i] = ["NaN", file_path, str(lines.index(dir)), str(dir)]
             i += 1
 
     new_f = Clean.assign_id(new_f, "label")
-    new_f.to_csv(name, header=headers, index=False)
+    if not id:
+        new_f.to_csv(name, sep=" ", quoting=csv.QUOTE_NONE, escapechar=" ", header=False, index=False)
+    else:
+        new_f.to_csv(name, header=headers, index=False)
+
+def shuffle_data(train_path, new_path):
+    with open(train_path,'r') as source:
+        data = [ (random.random(), line) for line in source ]
+        data.sort()
+    with open(new_path,'w') as target:
+        for _, line in data:
+            target.write( line )
 
 def generate_artist_file_system(path, dest_path):
     if os.path.exists(dest_path):
@@ -90,6 +104,18 @@ def generate_artist_file_system(path, dest_path):
 
 
 if __name__ == '__main__':
+<<<<<<< working copy
+    #path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
+    path = "../rasta/data/wikipaintings_full/wikipaintings_train"
+    class_path = "../data/wikipaintings_class_labels.txt"
+    #enumerate_class_names(class_path,path)
+    name = "../data/train.txt"
+    generate_image_id_file(name, path, class_path, id=False)
+    new_train_path = "../data/train_mixed.txt"
+    shuffle_data(name, new_train_path)
+    generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
+    shuffle_data("../data/val.txt", "../data/val_mixed.txt")
+=======
     path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
     #path = "../wikipaintings_small/wikipaintings_train"
     name = "../data/wikipaintings_class_labels_small.txt"
@@ -99,6 +125,7 @@ if __name__ == '__main__':
     x, y = get_input_data(data_file_name)
     print(type(x), type(y))
     print(x.shape, y.shape)
+>>>>>>> destination
     #path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     #val_file_name = "val.txt"
     #generate_image_id_file(val_file_name, path_val, name)
