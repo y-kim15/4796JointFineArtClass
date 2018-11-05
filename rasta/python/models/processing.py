@@ -7,7 +7,7 @@ import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import TensorBoard,ModelCheckpoint
 from keras.preprocessing.image import load_img
-from utils.utils import imagenet_preprocess_input,wp_preprocess_input,custom_preprocess_input
+from rasta.python.utils.utils import imagenet_preprocess_input,wp_preprocess_input,custom_preprocess_input
 
 PATH = os.path.dirname(__file__)
 SAVINGS_DIR = join(PATH,'../../savings')
