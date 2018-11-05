@@ -4,6 +4,7 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Flatten
 import os
+from contextlib import redirect_stdout
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -24,9 +25,11 @@ def wp_preprocess_input(x):
 
     return x
 _NUM_CLASSES = 25
-_BATCH_SIZE = 100
-_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"#"../data/wikipaintings_small/wikipaintings_train"
-_VAL_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"#"../data/wikipaintings_small/wikipaintings_val"
+_BATCH_SIZE = 25
+#_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
+_PATH = "../rasta/data/wikipaintings_full/wikipaintings_train"
+#_VAL_PATH = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
+_VAL_PATH = "../rasta/data/wikipaintings_full/wikipaintings_val"
 def tfdata_generator(images, labels, is_training, batch_size=_BATCH_SIZE):
   '''Construct a data generator using `tf.Dataset`. '''
 
@@ -74,9 +77,9 @@ base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299
 # add a global spatial average pooling layer
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
-x = Flatten()(x)
+#x = Flatten()(x)
 # let's add a fully-connected layer
-#x = Dense(1024, activation='relu')(x)
+x = Dense(1024, activation='relu')(x)
 # and a logistic layer -- let's say we have 200 classes
 predictions = Dense(_NUM_CLASSES, activation='softmax')(x)
 
@@ -90,7 +93,12 @@ for layer in base_model.layers:
 
 # compile the model (should be done *after* setting layers to non-trainable)
 model.compile(optimizer='rmsprop', loss='categorical_crossentropy',metrics=['accuracy'])
-model.summary()
+#model.summary()
+
+with open('../data/model_summary.txt', 'w') as f:
+    with redirect_stdout(f):
+        model.summary()
+"""
 # train the model on the new data for a few epochs
 #model.fit_generator(...)
 model.fit_generator(
@@ -100,7 +108,7 @@ model.fit_generator(
 #model.fit(training_set.make_one_shot_iterator(), steps_per_epoch = len(x_train)//_BATCH_SIZE, epochs=5, validation_data=testing_set.make_one_shot_iterator(),
 #validation_steps=len(x_test) // _BATCH_SIZE, verbose=1)
 model.save("inception_v3_wp_full.h5py")
-"""
+
 # at this point, the top layers are well trained and we can start fine-tuning
 # convolutional layers from inception V3. We will freeze the bottom N layers
 # and train the remaining top layers.
@@ -109,7 +117,7 @@ model.save("inception_v3_wp_full.h5py")
 # we should freeze:
 for i, layer in enumerate(base_model.layers):
    print(i, layer.name)
-"""
+
 # we chose to train the top 2 inception blocks, i.e. we will freeze
 # the first 249 layers and unfreeze the rest:
 for layer in model.layers[:201]:
@@ -131,4 +139,4 @@ model.fit_generator(
         validation_data=validation_generator,
         validation_steps=count_files(_VAL_PATH)//_BATCH_SIZE
 )
-model.save("inception_v3_wp_full_50layers.h5py")
+model.save("inception_v3_wp_full_50layers.h5py")"""

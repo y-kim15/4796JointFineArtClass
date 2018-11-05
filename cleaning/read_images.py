@@ -5,14 +5,6 @@ import pandas
 import csv
 from clean_csv import Clean
 import imageio
-from tensorflow.keras.preprocessing.image import load_img, ImageDataGenerator
-_NUM_SAMPLES = 1000
-
-
-def get_generator(data_path):
-    # data_path: path to the parent dir containing all class upper_dirs
-    return
-
 
 
 def get_image_matrix(file_path, id, col_name):
@@ -104,7 +96,6 @@ def generate_artist_file_system(path, dest_path):
 
 
 if __name__ == '__main__':
-<<<<<<< working copy
     #path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
     path = "../rasta/data/wikipaintings_full/wikipaintings_train"
     class_path = "../data/wikipaintings_class_labels.txt"
@@ -115,17 +106,6 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")
-=======
-    path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
-    #path = "../wikipaintings_small/wikipaintings_train"
-    name = "../data/wikipaintings_class_labels_small.txt"
-    #enumerate_class_names(name,path)
-    data_file_name = "../data/train_data_small.txt"
-    generate_image_id_file(data_file_name, path, name)
-    x, y = get_input_data(data_file_name)
-    print(type(x), type(y))
-    print(x.shape, y.shape)
->>>>>>> destination
     #path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     #val_file_name = "val.txt"
     #generate_image_id_file(val_file_name, path_val, name)
