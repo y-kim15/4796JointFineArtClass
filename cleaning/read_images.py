@@ -31,7 +31,7 @@ def get_sample_n_per_artist(f, dir_name, class_dir_path, total_n_work, proportio
     actual = math.trunc(total_n_work*proportion)
     artist_dict = get_n_per_artist(class_dir_path)
     f = open(f, "a")
-    f.write("=========="+dir_name+"============\n")
+    f.write("\n=========="+dir_name+"============\n")
     f.write("Total: "+str(count_works(artist_dict))+"\n")
     f.write("Proposed: "+str(actual)+"\n")
     f.write("Number of Artists:"+str(len(artist_dict))+"\n")
@@ -102,7 +102,7 @@ def get_small_dataset_from_large_by_artist(large_path, proportion, dest_path, su
                     count -= 1
                     final_total += 1
         f = open(summary_path, "a")
-        f.write("******Final Total******"+str(final_total)+"\n")
+        f.write("\n******Final Total******"+str(final_total)+"\n")
         f.close()
 
 def get_image_matrix(file_path, id, col_name):
@@ -202,9 +202,9 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "../rasta/data/wikipaintings_full/wikipaintings_test"
-    dest_path = "../rasta/data/wiki_small/wiki_test"
-    get_small_dataset_from_large_by_artist(path, 0.2, dest_path, "../summary.txt")
+    path = "../rasta/data/wikipaintings_full/wikipaintings_train"
+    dest_path = "../rasta/data/wiki_small/wiki_train"
+    get_small_dataset_from_large_by_artist(path, 0.05, dest_path, "../summary_train.txt")
 
     #path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     #val_file_name = "val.txt"

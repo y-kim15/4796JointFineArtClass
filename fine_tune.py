@@ -1,7 +1,7 @@
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Model, Sequential
+from tensorflow.keras.models import Model, Sequential, load_model
 from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling2D, Flatten, Dropout
 from rasta.python.utils.utils import wp_preprocess_input
 from rasta.python.models.processing import count_files
@@ -84,7 +84,30 @@ def train_model(model_type, input_shape, n_classes, n_tune_layers, pretrained=Tr
     return null
 """
 
-def finetune_model(model_type, input_shape, n_classes, n_tune_layers, train_path, val_path, horizontal_flip, batch_size, epochs=20, save=True):
+def fine_tune_trained_model_load(name, model_path, input_shape, n_tune_layers,train_path, val_path, horizontal_flip, batch_size, epochs=20, save=True):
+    model = load_model(model_path)
+    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]), horizontal_flip=horizontal_flip)
+    val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]), horizontal_flip=horizontal_flip)
+    for layer in model.layers[:len(model.layers)-n_tune_layers]:
+       layer.trainable = False
+    for layer in model.layers[len(model.layers)-n_tune_layers:]:
+       layer.trainable = True
+    from tensorflow.keras.optimizers import SGD
+    model.compile(optimizer=SGD(lr=0.0001, momentum=0.9), loss='categorical_crossentropy', metrics=["accuracy"])
+
+    # we train our model again (this time fine-tuning the top 2 inception blocks
+    # alongside the top Dense layers
+    model.fit_generator(
+            train_generator,
+            steps_per_epoch=count_files(train_path)//batch_size,
+            epochs=20,
+            validation_data=val_generator,
+            validation_steps=count_files(val_path)//batch_size
+    )
+    model.save(name+"_tuned_"+n_tune_layers+".h5py")
+    return
+
+def finetune_model_last_layer(model_type, input_shape, n_classes, train_path, val_path, horizontal_flip, batch_size, epochs=20, save=True):
     # tune output layer
     base_model, output = get_model[model_type](input_shape, n_classes, pretrained=True)
     train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]), horizontal_flip=horizontal_flip)
@@ -102,10 +125,10 @@ def finetune_model(model_type, input_shape, n_classes, n_tune_layers, train_path
     if save:
         save_summary(name, model)
     model.fit_generator(train_generator, steps_per_epoch=count_files(train_path)//batch_size, epochs=epochs)
-    val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]), horizontal_flip=horizontal_flip)
-
+    model_path = name+"_last_layer.h5py"
+    model.save(model_path)
     # either make a separate function tune_layers so just write it here
-    return
+    return name, model_path
 
 def train_empty(model_type, input_shape, n_classes, epochs, train_path, val_path, horizontal_flip, batch_size, save=True):
     model = get_model[model_type](input_shape, n_classes, pretrained=False)
