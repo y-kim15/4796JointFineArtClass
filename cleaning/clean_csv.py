@@ -1,8 +1,10 @@
 import pandas
 import unidecode
 import os
+
 # methods to process idb csv file
-special_char = { "aEURoe": "", "aEUR": "", "a%0" : "e", "EUR(tm)" : "", "a3" : "o", "a(c)": "e", "aa": "a", "aSS": "c"}
+special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
+
 
 class Clean:
     def read_csv(path):
@@ -32,8 +34,8 @@ class Clean:
                 else:
                     if str in old:
                         new = old.replace(str, "")
-                #print("Yes")
-                #new = old.replace(str, "")
+                # print("Yes")
+                # new = old.replace(str, "")
             else:
                 old = unidecode.unidecode(old)
 
@@ -41,10 +43,7 @@ class Clean:
                 for j in special_char:
                     if j in old:
                         new_str = new_str.replace(j, special_char[j])
-                for j in special_char2:
-                    if j in old:
-                        new_str = new_str.replace(j, special_char2[j])
-                #if new_str == "":
+                # if new_str == "":
                 #    new_str = old
                 new = new_str
 
@@ -56,12 +55,12 @@ class Clean:
         # creates unique id for every row in format of xx-yy where xx for artist
         # yy for work count of an artist
         # col_name to generate the code on
-        new_data = pandas.DataFrame.copy(data) # MIGHT NOT NEED THIS
+        new_data = pandas.DataFrame.copy(data)  # MIGHT NOT NEED THIS
         i = 0  # total
-        current = "" # current artist
-        current_i = 0 # current artist count
-        current_j = 0 # current artist work count
-        #for(new, old) in zip (new_data["agent_display"], data["agent_display"]):
+        current = ""  # current artist
+        current_i = 0  # current artist count
+        current_j = 0  # current artist work count
+        # for(new, old) in zip (new_data["agent_display"], data["agent_display"]):
         for old in data[col_name]:
             if i == 0:
                 current_i += 1
@@ -69,36 +68,36 @@ class Clean:
                 current = old
             else:
                 if old == current:
-                     current_j += 1
+                    current_j += 1
                 else:
                     current_i += 1
                     current_j = 1
                     current = old
-            new = str(current_i)+"-"+str(current_j)
+            new = str(current_i) + "-" + str(current_j)
             data.iloc[i]["id"] = new
             i += 1
         return data
 
     # https://www.bogotobogo.com/python/python_longest_common_substring_lcs_algorithm_generalized_suffix_tree.php
-    def lcs(S,T):
+    def lcs(S, T):
         m = len(S)
         n = len(T)
-        counter = [[0]*(n+1) for x in range(m+1)]
+        counter = [[0] * (n + 1) for x in range(m + 1)]
         longest = 0
         lcs_set = set()
         for i in range(m):
             for j in range(n):
                 if S[i] == T[j]:
                     c = counter[i][j] + 1
-                    counter[i+1][j+1] = c
+                    counter[i + 1][j + 1] = c
                     if c > longest:
                         lcs_set = set()
                         longest = c
-                        lcs_set.add(S[i-c+1:i+1])
+                        lcs_set.add(S[i - c + 1:i + 1])
                     elif c == longest:
-                        lcs_set.add(S[i-c+1:i+1])
+                        lcs_set.add(S[i - c + 1:i + 1])
         lcs_list = list(lcs_set)
-        if len(lcs_list) == 1 :
+        if len(lcs_list) == 1:
             return lcs_list[0]
         else:
             return ""
@@ -107,7 +106,7 @@ class Clean:
         # drop rows to be opted from the data and writes to a separate file
         new_data = pandas.DataFrame.copy(data)
         headers = list(data[:0])
-        dropped = pandas.DataFrame(columns = headers)
+        dropped = pandas.DataFrame(columns=headers)
 
         for index, row in data.iterrows():
             if type(str) is list:
@@ -133,16 +132,16 @@ class Clean:
         first = ""
         i = 0
         for index, row in new_data.iterrows():
-            #print(type(row["agent_display"]))
-            #print("current name is %s", row["agent_display"])
-            #print("current first is %s", first)
+            # print(type(row["agent_display"]))
+            # print("current name is %s", row["agent_display"])
+            # print("current first is %s", first)
             if first == "":
                 first = row["agent_display"]
             else:
                 out = Clean.lcs(first, row["agent_display"])
-                #print("out is %s", out)
+                # print("out is %s", out)
                 if Clean.lcs(first, row["agent_display"]) == first:
-                    #print("YES")
+                    # print("YES")
                     new_data.iloc[i]["agent_display"] = first
                 else:
                     first = row["agent_display"]
@@ -157,7 +156,7 @@ class Clean:
         rows = df.loc[df["id"].str.contains("-" + str(min))]
 
         for index, row in rows.iterrows():
-            #print(row["agent_display"])
+            # print(row["agent_display"])
             i += 1
         print("total number of artist is", i)
 
@@ -178,7 +177,8 @@ if __name__ == '__main__':
     data = Clean.assign_id(data, "agent_display")
     data.to_csv("./data/result_large.csv", header=headers, index=False)
     #print(headers)"""
-    Clean.find_artist_list(200, "../data/result_large.csv") #50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
+    Clean.find_artist_list(200,
+                           "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
 
-    #data = data.as_matrix()
-    #print(data)
+    # data = data.as_matrix()
+    # print(data)
