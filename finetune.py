@@ -2,7 +2,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Model, Sequential, load_model
-from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling2D, Flatten, Dropout
+from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling2D, Flatten
 from rasta.python.utils.utils import wp_preprocess_input
 from rasta.python.models.processing import count_files
 from contextlib import redirect_stdout
@@ -16,10 +16,9 @@ dirname = os.path.dirname(__file__)
 # that from rasta and from ...
 
 def get_vgg16(input_shape, n_classes, pretrained=True):
-    input = Input(shape=input_shape)
     if not pretrained:
-        base_model = VGG16(include_top=True, weights='None', input_shape=input_shape)
-        return base_model
+        base_model = VGG16(include_top=False, weights=None, input_shape=input_shape)
+        # return base_model
     else:
         base_model = VGG16(include_top=False, weights='imagenet', input_shape=input_shape)
 
@@ -94,7 +93,7 @@ def train_model(model_type, input_shape, n_classes, n_tune_layers, pretrained=Tr
 
 
 def fine_tune_trained_model_load(name, model_path, input_shape, n_tune_layers, train_path, val_path, horizontal_flip,
-                                 batch_size, epochs=20, save=True):
+                                 batch_size, epochs, save=True):
     model = load_model(model_path)
     train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                     horizontal_flip=horizontal_flip)
@@ -112,16 +111,16 @@ def fine_tune_trained_model_load(name, model_path, input_shape, n_tune_layers, t
     model.fit_generator(
         train_generator,
         steps_per_epoch=count_files(train_path) // batch_size,
-        epochs=20,
+        epochs=epochs,
         validation_data=val_generator,
         validation_steps=count_files(val_path) // batch_size
     )
-    model.save(name + "_tuned_" + n_tune_layers + ".h5py")
+    model.save(name + "_tuned_" + str(n_tune_layers) + ".h5py")
     return
 
 
-def finetune_model_last_layer(model_type, input_shape, n_classes, train_path, val_path, horizontal_flip, batch_size,
-                              epochs=20, save=True):
+def finetune_model_last_layer(model_type, input_shape, n_classes, train_path, horizontal_flip, batch_size,
+                              epochs, save=True):
     # tune output layer
     base_model, output = get_model[model_type](input_shape, n_classes, pretrained=True)
     train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
@@ -148,20 +147,24 @@ def finetune_model_last_layer(model_type, input_shape, n_classes, train_path, va
 
 def train_empty(model_type, input_shape, n_classes, epochs, train_path, val_path, horizontal_flip, batch_size,
                 save=True):
-    model = get_model[model_type](input_shape, n_classes, pretrained=False)
+    base_model, output = get_model[model_type](input_shape, n_classes, pretrained=False)
     train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                     horizontal_flip=horizontal_flip)
+    model = Model(inputs=base_model.input, outputs=output(base_model.output))
+    for layer in model.layers[:18]:
+        layer.trainable = False
     model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     name = get_model_name(model_type, empty=True)
     if save:
         save_summary(name, model)
     val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                   horizontal_flip=horizontal_flip)
-    model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size, epochs=epochs,
-                        validation_data=val_generator,
-                        validation_steps=count_files(val_path) // batch_size)
+
+    model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size, epochs=epochs,)
+                       # validation_data=val_generator,
+                        # validation_steps=count_files(val_path) // batch_size)
     file_path = os.path.join(dirname, "models", name)
-    model.save(file_path)
+    model.save(name+"_empty.h5py")
     return file_path
 
 

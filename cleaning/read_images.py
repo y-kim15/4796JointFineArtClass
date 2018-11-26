@@ -6,6 +6,7 @@ from cleaning.clean_csv import Clean
 import imageio
 import math
 import glob
+import random
 
 N_CLASSES = 25
 
@@ -75,7 +76,7 @@ def get_sample_n_per_artist(f, dir_name, class_dir_path, total_n_work, proportio
 
 def get_small_dataset_from_large_by_artist(large_path, proportion, dest_path, summary_path):
     # example of large path would be wikipaintings_train/test/val
-    # example of dest path would be wiki_small_train/test/val
+    # example of dest path would be wiki_small/wiki_test/val
     final_total = 0
     if os.path.exists(dest_path):
         shutil.rmtree(dest_path)
@@ -88,24 +89,37 @@ def get_small_dataset_from_large_by_artist(large_path, proportion, dest_path, su
         os.mkdir(os.path.join(dest_path, dir))
         dir_path = os.path.join(large_path, dir)
         dirs = os.listdir(dir_path)
-        n = 0
-        for t in list(os.walk(dir_path)):
-            n += len(t[2])
+        n = count_files(dir_path)
         artist_dict = get_sample_n_per_artist(summary_path, dir, dir_path, n, proportion)
-        for a, n in artist_dict.items():
+        for a, q in artist_dict.items():
             name = a + "_*"
-            count = n
-            current_item_path = os.path.join(dir_path, name)
-            for work in glob.iglob(os.path.join(dir_path, name)):
+            count = q
+            works = list(glob.iglob(os.path.join(dir_path, name)))
+            index_list = []
+            for x in range(count):
+                index = random.randint(0, len(works)-1)
+                while index in index_list:
+                    index = random.randint(0, len(works)-1)
+                index_list.append(index)
+                shutil.copy(works[index], os.path.join(dest_path, dir, os.path.basename(os.path.normpath(works[index]))))
+                final_total += 1
+            """for work in glob.iglob(os.path.join(dir_path, name)):
                 if count == 0:
                     break
                 else:
                     shutil.copy(work, os.path.join(dest_path, dir, os.path.basename(os.path.normpath(work))))
                     count -= 1
-                    final_total += 1
+                    final_total += 1"""
         f = open(summary_path, "a")
         f.write("\n******Final Total******" + str(final_total) + "\n")
         f.close()
+
+
+def count_files(path):
+    n = 0
+    for t in list(os.walk(path)):
+        n += len(t[2])
+    return n
 
 
 def get_image_matrix(file_path, id, col_name):
@@ -210,9 +224,9 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "../rasta/data/wikipaintings_full/wikipaintings_train"
-    dest_path = "../rasta/data/wiki_small/wiki_train"
-    get_small_dataset_from_large_by_artist(path, 0.05, dest_path, "../summary_train.txt")
+    path = "../data/wikipaintings_full/wikipaintings_val"
+    dest_path = "../data/wiki_small2/wiki_val"
+    get_small_dataset_from_large_by_artist(path, 0.15, dest_path, "../summary_val.txt")
 
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"
