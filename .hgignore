@@ -1,5 +1,9 @@
-rasta/data
+data/wiki*
 lib
 lib64
 include
 cleaning/inception_*
+.idea
+summary_*
+vgg16_*
+.xlsx
