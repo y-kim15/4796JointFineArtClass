@@ -14,7 +14,7 @@
 # ==============================================================================
 """Ops for building neural network losses.
 
-See [Contrib Losses](https://tensorflow.org/api_guides/python/contrib.losses).
+See @{$python/contrib.losses}.
 """
 
 from __future__ import absolute_import
@@ -35,3 +35,5 @@ _allowed_symbols = [
     'triplet_semihard_loss',
 ]
 remove_undocumented(__name__, _allowed_symbols)
+
+

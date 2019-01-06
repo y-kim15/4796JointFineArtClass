@@ -47,8 +47,11 @@ def auto_shard_dataset(dataset, num_shards, index):
 
   Returns:
     A modified `Dataset` obtained by updating the pipeline sharded by the
-    files. The input dataset will be returned if we cannot automatically
-    determine a good way to shard the input dataset.
+    files.
+
+  Raises:
+    NotImplementedError: If we cannot automatically determine a good way to
+      shard the input dataset.
   """
 
   # TODO(priyag): Clone datasets instead of updating in place, similar to the
@@ -124,10 +127,8 @@ def auto_shard_dataset(dataset, num_shards, index):
       tf_logging.warn(
           "Could not find a standard reader in the input pipeline"
           "(one of TextLineDataset, TFRecordDataset, FixedLengthRecordDataset)."
-          "So auto-sharding is not done. Please verify correctness of "
-          "auto-sharding for your input.")
-      # TODO(yuefengz): maybe still shard it?
-      return dataset
+          "Falling back to sharding the dataset anyway. Please verify"
+          "correctness of auto-sharding for your input.")
 
     # TODO(priyag): What do we want to do if the number of filenames is
     # uneven in the number of shards? By default, this will just return as

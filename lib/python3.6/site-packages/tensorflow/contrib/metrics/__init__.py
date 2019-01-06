@@ -14,9 +14,7 @@
 # ==============================================================================
 """Ops for evaluation metrics and summary statistics.
 
-See the
-[Contrib Metrics](https://tensorflow.org/api_guides/python/contrib.metrics)
-guide.
+See the @{$python/contrib.metrics} guide.
 
 @@auc_with_confidence_intervals
 @@streaming_accuracy

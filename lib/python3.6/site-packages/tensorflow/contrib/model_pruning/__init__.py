@@ -33,9 +33,6 @@ from tensorflow.contrib.model_pruning.python.pruning import get_thresholds
 from tensorflow.contrib.model_pruning.python.pruning import get_weight_sparsity
 from tensorflow.contrib.model_pruning.python.pruning import get_weights
 from tensorflow.contrib.model_pruning.python.pruning import Pruning
-from tensorflow.contrib.model_pruning.python.strip_pruning_vars_lib import graph_def_from_checkpoint
-from tensorflow.contrib.model_pruning.python.strip_pruning_vars_lib import strip_pruning_vars_fn
-
 # pylint: enable=unused-import
 
 from tensorflow.python.util.all_util import remove_undocumented
@@ -44,8 +41,7 @@ _allowed_symbols = [
     'masked_convolution', 'masked_conv2d', 'masked_fully_connected',
     'MaskedBasicLSTMCell', 'MaskedLSTMCell', 'train', 'apply_mask',
     'get_masked_weights', 'get_masks', 'get_pruning_hparams', 'get_thresholds',
-    'get_weights', 'get_weight_sparsity', 'Pruning', 'strip_pruning_vars_fn',
-    'graph_def_from_checkpoint'
+    'get_weights', 'get_weight_sparsity', 'Pruning'
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

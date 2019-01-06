@@ -88,7 +88,7 @@ class HostExecutor : public internal::StreamExecutorInterface {
                 uint64 size) override;
 
   // No "synchronize all activity" implemented for this platform at the moment.
-  bool SynchronizeAllActivity() override { return true; }
+  bool SynchronizeAllActivity() override { return false; }
   bool SynchronousMemZero(DeviceMemoryBase *location, uint64 size) override;
 
   bool SynchronousMemSet(DeviceMemoryBase *location, int value,
@@ -202,7 +202,7 @@ class HostExecutor : public internal::StreamExecutorInterface {
     return std::unique_ptr<internal::TimerInterface>(new HostTimer());
   }
 
-  void *GpuContextHack() override { return nullptr; }
+  void *CudaContextHack() override { return nullptr; }
 
  private:
   const PluginConfig plugin_config_;

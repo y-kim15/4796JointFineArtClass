@@ -48,9 +48,11 @@ def get_test1(input_shape, n_classes, pretrained=True):
     from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Dropout, Input
 
     base_model = Sequential()
-    base_model.add(Conv2D(96, (11, 11), strides=(4, 4), input_shape=input_shape, activation='relu', padding='valid'))
+    base_model.add(Conv2D(64, (7, 7), strides=(4, 4), input_shape=input_shape, activation='relu', padding='valid'))
     base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
     base_model.add(Conv2D(128, (5, 5), strides=(2, 2), activation='relu'))
+    base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu'))
     base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
 
     out = Sequential()
@@ -94,8 +96,8 @@ def get_vgg16(input_shape, n_classes, pretrained=True):
 
 def get_inceptionv3(input_shape, n_classes, pretrained=True):
     if not pretrained:
-        base_model = InceptionV3(include_top=True, weights='None', input_shape=input_shape)
-        return base_model
+        base_model = InceptionV3(include_top=True, weights=None, input_shape=input_shape)
+
     else:
         base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=input_shape)
 
@@ -202,6 +204,7 @@ def train_empty(model_type, input_shape, n_classes, epochs, train_path, val_path
     #for layer in model.layers[:18]:
      #   layer.trainable = False
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
     name = get_model_name(model_type, empty=True)
     if save:
         save_summary(name, model)

@@ -484,8 +484,7 @@ def train(train_op,
           save_checkpoint_secs=600,
           save_summaries_steps=100,
           config=None,
-          max_wait_secs=7200,
-          run_metadata=None):
+          max_wait_secs=7200):
   """Runs the training loop.
 
   Args:
@@ -512,7 +511,6 @@ def train(train_op,
       become available. This should be kept relatively short to help detect
       incorrect code, but sometimes may need to be increased if the chief takes
       a while to start up.
-    run_metadata: A [`RunMetadata`] protocol buffer.
 
   Returns:
     the value of the loss function after training.
@@ -543,5 +541,5 @@ def train(train_op,
       max_wait_secs=max_wait_secs) as session:
     loss = None
     while not session.should_stop():
-      loss = session.run(train_op, run_metadata=run_metadata)
+      loss = session.run(train_op)
   return loss

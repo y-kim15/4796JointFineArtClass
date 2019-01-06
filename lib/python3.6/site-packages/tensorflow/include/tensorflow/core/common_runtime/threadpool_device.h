@@ -29,6 +29,7 @@ class ThreadPoolDevice : public LocalDevice {
                    Allocator* allocator);
   ~ThreadPoolDevice() override;
 
+  void Compute(OpKernel* op_kernel, OpKernelContext* context) override;
   Allocator* GetAllocator(AllocatorAttributes attr) override;
   Allocator* GetScopedAllocator(AllocatorAttributes attr,
                                 int64 step_id) override;

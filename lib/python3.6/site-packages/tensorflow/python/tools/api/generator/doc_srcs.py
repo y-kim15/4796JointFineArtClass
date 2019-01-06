@@ -62,6 +62,8 @@ _TENSORFLOW_DOC_SOURCES = {
     'sysconfig': DocSource(docstring_module_name='platform.sysconfig'),
     'test': DocSource(docstring_module_name='platform.test'),
     'train': DocSource(docstring_module_name='training.training'),
+    'train.queue_runner': DocSource(
+        docstring_module_name='training.queue_runner'),
 }
 
 _ESTIMATOR_DOC_SOURCES = {

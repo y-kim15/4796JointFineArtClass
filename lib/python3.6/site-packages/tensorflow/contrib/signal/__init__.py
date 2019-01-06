@@ -14,9 +14,7 @@
 # ==============================================================================
 """Signal processing operations.
 
-See the
-[Contrib Signal](https://tensorflow.org/api_guides/python/contrib.signal)
-guide.
+See the @{$python/contrib.signal} guide.
 
 @@frame
 @@hamming_window

@@ -14,6 +14,8 @@
 # ==============================================================================
 # pylint: disable=g-short-docstring-punctuation
 """Histograms.
+
+Please see @{$python/histogram_ops} guide.
 """
 
 from __future__ import absolute_import

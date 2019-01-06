@@ -15,9 +15,7 @@
 
 """Integration and ODE solvers.
 
-See the
-[Contrib Integrate](https://tensorflow.org/api_guides/python/contrib.integrate)
-guide.
+See the @{$python/contrib.integrate} guide.
 
 @@odeint
 @@odeint_fixed

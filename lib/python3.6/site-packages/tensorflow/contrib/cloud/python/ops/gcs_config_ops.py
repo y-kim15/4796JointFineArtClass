@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import json
-import os
 
 from tensorflow.contrib.cloud.python.ops import gen_gcs_config_ops
 from tensorflow.python.framework import dtypes
@@ -189,8 +188,6 @@ def configure_colab_session(session):
     session: A `tf.Session` session.
   """
   # Read from the application default credentials (adc).
-  adc_filename = os.environ.get(
-      'GOOGLE_APPLICATION_CREDENTIALS', '/content/adc.json')
-  with open(adc_filename) as f:
+  with open('/content/datalab/adc.json') as f:
     data = json.load(f)
   configure_gcs(session, credentials=data)

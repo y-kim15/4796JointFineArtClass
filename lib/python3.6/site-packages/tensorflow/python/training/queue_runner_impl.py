@@ -27,14 +27,10 @@ from tensorflow.python.eager import context
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
 from tensorflow.python.platform import tf_logging as logging
-from tensorflow.python.util import deprecation
 from tensorflow.python.util.tf_export import tf_export
 
-_DEPRECATION_INSTRUCTION = (
-    "To construct input pipelines, use the `tf.data` module.")
 
-
-@tf_export(v1=["train.queue_runner.QueueRunner", "train.QueueRunner"])
+@tf_export("train.queue_runner.QueueRunner", "train.QueueRunner")
 class QueueRunner(object):
   """Holds a list of enqueue operations for a queue, each to be run in a thread.
 
@@ -57,7 +53,6 @@ class QueueRunner(object):
   @end_compatibility
   """
 
-  @deprecation.deprecated(None, _DEPRECATION_INSTRUCTION)
   def __init__(self, queue=None, enqueue_ops=None, close_op=None,
                cancel_op=None, queue_closed_exception_types=None,
                queue_runner_def=None, import_scope=None):
@@ -391,8 +386,7 @@ class QueueRunner(object):
                        import_scope=import_scope)
 
 
-@tf_export(v1=["train.queue_runner.add_queue_runner", "train.add_queue_runner"])
-@deprecation.deprecated(None, _DEPRECATION_INSTRUCTION)
+@tf_export("train.queue_runner.add_queue_runner", "train.add_queue_runner")
 def add_queue_runner(qr, collection=ops.GraphKeys.QUEUE_RUNNERS):
   """Adds a `QueueRunner` to a collection in the graph.
 
@@ -411,9 +405,8 @@ def add_queue_runner(qr, collection=ops.GraphKeys.QUEUE_RUNNERS):
   ops.add_to_collection(collection, qr)
 
 
-@tf_export(v1=["train.queue_runner.start_queue_runners",
-               "train.start_queue_runners"])
-@deprecation.deprecated(None, _DEPRECATION_INSTRUCTION)
+@tf_export("train.queue_runner.start_queue_runners",
+           "train.start_queue_runners")
 def start_queue_runners(sess=None, coord=None, daemon=True, start=True,
                         collection=ops.GraphKeys.QUEUE_RUNNERS):
   """Starts all queue runners collected in the graph.
@@ -464,13 +457,6 @@ def start_queue_runners(sess=None, coord=None, daemon=True, start=True,
       return []
     raise TypeError("sess must be a `tf.Session` object. "
                     "Given class: {}".format(sess.__class__))
-
-  queue_runners = ops.get_collection(collection)
-  if not queue_runners:
-    logging.warning(
-        "`tf.train.start_queue_runners()` was called when no queue runners "
-        "were defined. You can safely remove the call to this deprecated "
-        "function.")
 
   with sess.graph.as_default():
     threads = []

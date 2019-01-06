@@ -15,7 +15,7 @@
 
 """Testing.
 
-See the [Testing](https://tensorflow.org/api_guides/python/test) guide.
+See the @{$python/test} guide.
 
 Note: `tf.test.mock` is an alias to the python `mock` or `unittest.mock`
 depending on the python version.
