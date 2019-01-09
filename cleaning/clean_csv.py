@@ -192,8 +192,11 @@ class Clean:
         return False
 
     @staticmethod
-    def check_if_true(df, artist_str, title_str, d, **date):
-        artist_rows = df.loc[df["agent_display"].str.contains(artist_str)]
+    def check_if_true(df, sub_df, artist_str, title_str, d, **date):
+        if sub_df is not None and Clean.check_if_similar(sub_df[0]["agent_display"], artist_str, True):
+            artist_rows = sub_df
+        else:
+            artist_rows = df.loc[df["agent_display"].str.contains(artist_str)]
         total_drop = 0
         new_df = pandas.DataFrame.copy(df)
         for i in range(artist_rows.shape[0]):
@@ -205,8 +208,8 @@ class Clean:
         if d:
             date_str = date["date"]
             # date = df["date_display"].apply(lambda x: Clean.check_if_similar(date_str, x, None))
-        print("Total dropped is ", total_drop)
-        return new_df
+
+        return new_df, sub_df, total_drop
 
 
 
@@ -219,34 +222,37 @@ class Clean:
         headers = list(df[:0])
         dirs = os.listdir(data_path)
         date = ""
+        sub_df = None
+        total_drop = 0
         for dir in dirs:
             styles = os.listdir(os.path.join(data_path, dir))
             for style in styles:
+                style_drop = 0
                 works = os.listdir(os.path.join(data_path, dir, style))
                 for work in works:
-                    print("work is ", work)
                     strs = work.split("_")
                     artist = strs[0]
-                    title = strs[1]
+                    title = strs[1].replace('.jpg', '')
                     split = title.rsplit("-", 1)
-                    print("split is ", split)
                     if len(split) > 1:
-                        val = split[1].replace('.jpg', '')
                         # if for case xxxx.jpg
-                        if re.match('^\d{4}$', val):
-                            date = val
+                        if re.match('^\d{4}$', split[1]):
+                            date = split[1]
                             title = split[0]
                         # elif for case where there is xxxx-x.jpg format where year is former
-                        elif re.match('^\d{4}$', split[0].rsplit("-", 1)[1]):
-                            date = split[0].rsplit("-", 1)[1]
-                            #TODO
-                        # else for case where there is no date xxxx
-                        else:
-                            title = strs[1].replace('.jpg', '')
+                        elif len(split[0].rsplit("-",1)) > 1 and re.match('^\d{4}$', split[0].rsplit("-", 1)[1]):
+
+                            sub = split[0].rsplit("-", 1)
+                            date = sub[1]
+                            title = sub[0]
                     if date != "":
-                        df = Clean.check_if_true(df, artist, title, True, date=date)
+                        df, sub_df, drop = Clean.check_if_true(df, sub_df, artist, title, True, date=date)
                     else:
-                        df = Clean.check_if_true(df, artist, title, False)
+                        df, sub_df, drop = Clean.check_if_true(df, sub_df, artist, title, False)
+                    style_drop += drop
+            total_drop += style_drop
+            print("Style " + style + " dropped: ", str(style_drop))
+        print("Total dropped is ", str(total_drop))
         df.to_csv(output_csv, header=headers, index=False)
         return df
 
@@ -268,6 +274,7 @@ if __name__ == '__main__':
     data.to_csv("./data/result_large.csv", header=headers, index=False)
     #print(headers)"""
     #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
-    Clean.remove_match_images("../data/wiki_small", "../data/result_small.csv", "../data/filtered_large_from_small.csv" )
-    # data = data.as_matrix()
-    # print(data)
+    Clean.remove_match_images("../data/wiki", "../data/result_small.csv", "../data/filtered_large_from_small.csv" )
+
+
+
