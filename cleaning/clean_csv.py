@@ -1,6 +1,11 @@
 import pandas
 import unidecode
-import os, re
+import os
+import re
+import sys
+from PIL import Image
+import requests
+import time
 
 # methods to process idb csv file
 special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
@@ -211,9 +216,6 @@ class Clean:
 
         return new_df, sub_df, total_drop
 
-
-
-
     @staticmethod
     def remove_match_images(data_path, input_csv, output_csv):
         # read in csv
@@ -255,6 +257,30 @@ class Clean:
         print("Total dropped is ", str(total_drop))
         df.to_csv(output_csv, header=headers, index=False)
         return df
+
+    @staticmethod
+    def _download_image(file_name, url):
+        try:
+            img = Image.open(requests.get(url, stream=True).raw).convert('RGB')
+            img.save(file_name + '.jpg', 'JPEG')
+        except OSError:
+            print('Error downloading image', file_name)
+
+    @staticmethod
+    def download_image_database(input_csv, target_path):
+        # method referred from rasta.python.utils.load_data.download_wikipaintings() and _download_image()
+        df = pandas.read_csv(input_csv, encoding='utf-8-sig')
+        df.set_index(['id'])
+        n = 0
+        for index, row in df.iterrows():
+            filename = target_path + '/' + row['agent_display'] + "_" + row['title_display']
+            Clean._download_image(filename, row['full size'])
+            n += 1
+            if n % 5 == 0:
+                sys.stdout.flush()
+                time.sleep(1)
+        return df
+
 
 
 if __name__ == '__main__':
