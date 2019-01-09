@@ -1,5 +1,5 @@
 import shutil, os
-import random
+import time
 import pandas
 import csv
 from cleaning.clean_csv import Clean
@@ -10,109 +10,112 @@ import random
 
 N_CLASSES = 25
 
+def create_dir(file_path):
+    # method to create directory if doesn't exist, overwrite current if exists
+    if os.path.exists(file_path):
+        shutil.rmtree(file_path)
+    os.makedirs(file_path)
 
 def count_works(dict):
+    # method to count total number of items in dict
     total = 0
     for _, n in dict.items():
         total += n
     return total
 
 
-def get_n_per_artist(class_dir_path):
+def get_n_per_artist(class_dir_path, summary_path):
+    # method to return a dictionary with artist name and number of works done by each artist
+    # dict key : artist name, value : no of works
     artist_dict = {}
+    f = open(summary_path, "a")
+    f.write("Size by artist\n")
     for item in os.listdir(class_dir_path):
         artist = item.split('_')[0]
         if artist in artist_dict:
             artist_dict[artist] += 1
         else:
             artist_dict[artist] = 1
+    f.write(str(artist_dict) + "\n")
+    f.close()
     return artist_dict
 
 
-def get_sample_n_per_artist(f, dir_name, class_dir_path, total_n_work, proportion):
-    # method to return the list with number of works to get from each artist
-    actual = math.trunc(total_n_work * proportion)
-    artist_dict = get_n_per_artist(class_dir_path)
-    f = open(f, "a")
-    f.write("\n==========" + dir_name + "============\n")
-    f.write("Total: " + str(count_works(artist_dict)) + "\n")
-    f.write("Proposed: " + str(actual) + "\n")
-    f.write("Number of Artists:" + str(len(artist_dict)) + "\n")
+def get_sample_size_per_artist(class_dir_path, proportion, summary_path):
+    # method to count average number of works per artist per sample
+    artist_dict = get_n_per_artist(class_dir_path, summary_path)
     for a, n in artist_dict.copy().items():
-        if actual < len(artist_dict):
-            del artist_dict[a]
-        elif actual == len(artist_dict):
-            artist_dict[a] = 1
-    ave = math.trunc(actual / len(artist_dict))
-    if actual > len(artist_dict):
-        large = {}  # any artist with n greater than ave
-        short = 0
-        for a, n in artist_dict.items():
-            if n < ave:
-                short += (ave - n)
-            elif n > ave:
-                large[a] = (n - ave)
-                artist_dict[a] = ave
-        if ave == 1:
-            short = actual - len(artist_dict)
-        ave_short = math.trunc(short / len(large))
-        for a, n in large.copy().items():
-            if a not in large:
-                continue
-            elif short > 0:
-                ave_short = math.trunc(short / len(large))
-                if n >= ave_short:
-                    artist_dict[a] += ave_short
-                    del large[a]
-                    short -= ave_short
-                else:
-                    artist_dict[a] += n
-                    del large[a]
-                    short -= n
-    f.write("Final Total: " + str(count_works(artist_dict)) + "\n")
+        sample_size = math.trunc(n * proportion)
+        if sample_size == 0:
+            sample_size = 1
+        artist_dict[a] = sample_size
+    f = open(summary_path, "a")
+    f.write("Average Number of works per sample\n")
+    f.write(str(artist_dict) + "\n")
     f.close()
     return artist_dict
 
 
-def get_small_dataset_from_large_by_artist(large_path, proportion, dest_path, summary_path):
-    # example of large path would be wikipaintings_train/test/val
-    # example of dest path would be wiki_small/wiki_test/val
-    final_total = 0
-    if os.path.exists(dest_path):
-        shutil.rmtree(dest_path)
-    os.makedirs(dest_path)
-    dirs = os.listdir(large_path)
-    f = open(summary_path, "w+")
-    f.write("*********Summary by Directory*********\nProportion: " + str(proportion) + "\n")
-    f.close()
-    for dir in dirs:
-        os.mkdir(os.path.join(dest_path, dir))
-        dir_path = os.path.join(large_path, dir)
-        dirs = os.listdir(dir_path)
-        n = count_files(dir_path)
-        artist_dict = get_sample_n_per_artist(summary_path, dir, dir_path, n, proportion)
-        for a, q in artist_dict.items():
-            name = a + "_*"
-            count = q
-            works = list(glob.iglob(os.path.join(dir_path, name)))
-            index_list = []
-            for x in range(count):
-                index = random.randint(0, len(works)-1)
-                while index in index_list:
-                    index = random.randint(0, len(works)-1)
-                index_list.append(index)
-                shutil.copy(works[index], os.path.join(dest_path, dir, os.path.basename(os.path.normpath(works[index]))))
-                final_total += 1
-            """for work in glob.iglob(os.path.join(dir_path, name)):
-                if count == 0:
-                    break
-                else:
-                    shutil.copy(work, os.path.join(dest_path, dir, os.path.basename(os.path.normpath(work))))
-                    count -= 1
-                    final_total += 1"""
+def get_small_dataset(large_path, proportion, target_path, dir_name, summary_path):
+    # method to generate subsets of large dataset (train/test/val) according to given proportion
+    # dir_name denote (train/test/val)
+    n_dest = int(round(1 / proportion))
+    style_dirs = os.listdir(large_path)
+    total = 0
+    dir_count = [0]*n_dest
+    for style in style_dirs:
         f = open(summary_path, "a")
-        f.write("\n******Final Total******" + str(final_total) + "\n")
+        f.write("Style: " + style)
+        for i in range(n_dest):
+            os.mkdir(os.path.join(target_path + str(i), dir_name, style))
+        dir_path = os.path.join(large_path, style)
+        n = count_files(dir_path)
+        f.write(" Size: " + str(n) + "\n")
+        total += n
+        ave = int(round(n * proportion))
+        works = os.listdir(dir_path)
+        f.write("Average work size per Sample: " + str(ave) + "\n")
+        for i in range(n_dest):
+            count = 0
+            for x in range(ave):
+                index = i * ave + x
+                if index >= len(works):
+                    break
+                shutil.copy(os.path.join(dir_path, works[index]),
+                            os.path.join(target_path + str(i), dir_name, style,
+                                         os.path.basename(os.path.normpath(works[index]))))
+                count += 1
+            dir_count[i] += count
+    f.write("Total Per Sample Count: \n")
+    for item in dir_count:
+        f.write("%s\n" % item)
+    f.write("Total " + str(total))
+    f.close()
+    return
+
+
+def get_small_from_large_dataset(large_path, proportion, target_path, summary_path):
+    # method to generate subsets of wikipaintings_full by calling get_small_dataset
+    f = open(summary_path, "w+")
+    n_dest = int(round(1 / proportion))
+    f.write("*********Summary by Directory*********\nProportion: " + str(proportion) + "\nNo dirs: " + str(n_dest) + "\n")
+    f.close()
+    for i in range(n_dest):
+        if os.path.exists(target_path + str(i)):
+            shutil.rmtree(target_path + str(i))
+        os.makedirs(target_path + str(i))
+    dirs = os.listdir(large_path)
+    for d in dirs:
+        f = open(summary_path, "a")
+        large_split_path = os.path.join(large_path, d)
+        d_type = d.split('_', 1)[1]
+        f.write("split type: " + str(d_type) + "\n")
         f.close()
+        for i in range(n_dest):
+            dir_name = "small" + d_type
+            to_path = os.path.join(target_path + str(i), dir_name)
+            create_dir(to_path)
+        get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
 
 
 def count_files(path):
@@ -224,9 +227,10 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "../data/wikipaintings_full/wikipaintings_val"
-    dest_path = "../data/wiki_small2/wiki_val"
-    get_small_dataset_from_large_by_artist(path, 0.15, dest_path, "../summary_val.txt")
+    path = "../data/wikipaintings_full"
+    dest_path = "../data/wiki_small"
+    cur_time = time.strftime("%d%m%y_%H%M")
+    get_small_from_large_dataset(path, 0.1, dest_path, "../summary_"+cur_time+".txt")
 
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"
