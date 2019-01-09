@@ -12,16 +12,14 @@ from contextlib import redirect_stdout
 import datetime
 import os
 from os.path import join
+from cleaning.read_images import create_dir
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
 
 # Code influenced by keras application examples
 # that from rasta and from ...
-def create_dir(file_path):
-    if os.path.exists(file_path):
-        shutil.rmtree(file_path)
-    os.makedirs(file_path)
+
 
 def get_alexnet(input_shape, n_classes=25):
         inputs = Input(shape=(227, 227, 3))

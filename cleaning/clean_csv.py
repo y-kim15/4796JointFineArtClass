@@ -1,12 +1,13 @@
 import pandas
 import unidecode
-import os
+import os, re
 
 # methods to process idb csv file
 special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
 
 
 class Clean:
+    @staticmethod
     def read_csv(path):
         # read in csv
         data = pandas.read_csv(path, encoding='utf-8-sig')
@@ -17,6 +18,7 @@ class Clean:
         data["date_display"] = data["date_display"].apply(lambda x: str(x).lower())
         return data, headers
 
+    @staticmethod
     def remove_str(data, col_name, rm, **string):
         # remove a character from cells of a certain column
         # if true remove provided, else go through check on all special chars
@@ -51,6 +53,7 @@ class Clean:
             i += 1
         return new_data
 
+    @staticmethod
     def assign_id(data, col_name):
         # creates unique id for every row in format of xx-yy where xx for artist
         # yy for work count of an artist
@@ -78,6 +81,7 @@ class Clean:
             i += 1
         return data
 
+    @staticmethod
     # https://www.bogotobogo.com/python/python_longest_common_substring_lcs_algorithm_generalized_suffix_tree.php
     def lcs(S, T):
         m = len(S)
@@ -102,6 +106,7 @@ class Clean:
         else:
             return ""
 
+    @staticmethod
     def filter_to_file(path, data, str):
         # drop rows to be opted from the data and writes to a separate file
         new_data = pandas.DataFrame.copy(data)
@@ -127,6 +132,7 @@ class Clean:
         dropped.to_csv(path, header=headers, index=False)
         return new_data
 
+    @staticmethod
     def match_names(data):
         new_data = pandas.DataFrame.copy(data)
         first = ""
@@ -148,6 +154,7 @@ class Clean:
             i += 1
         return new_data
 
+    @staticmethod
     def find_artist_list(min, path):
         # find minimum number of works artists should have
         df = pandas.read_csv(path)
@@ -159,6 +166,89 @@ class Clean:
             # print(row["agent_display"])
             i += 1
         print("total number of artist is", i)
+
+    @staticmethod
+    def check_if_similar(sample_name, other_name, type):
+        # method to compare how similar the names are between the two, t artist name, f title
+        # applicable for checking equivalence of artist and title names
+        # sample_name: name of file, other_name: name on csv
+        sample = sample_name.split("-")
+        other = other_name.split("-")
+        if type:
+            # compare surnames
+            if sample[-1] == other[0]:
+                if len(sample) > 1 and len(other) > 1:
+                    if sample[0][0] == other[1][0]:
+                        return True
+                else:
+                    return True
+        elif type is None:
+            # date
+            if sample_name in other_name:
+                return True
+        else:
+            if sample_name == other_name or sample_name in other_name:
+                return True
+        return False
+
+    @staticmethod
+    def check_if_true(df, artist_str, title_str, d, **date):
+        artist_rows = df.loc[df["agent_display"].str.contains(artist_str)]
+        total_drop = 0
+        new_df = pandas.DataFrame.copy(df)
+        for i in range(artist_rows.shape[0]):
+            if Clean.check_if_similar(title_str, artist_rows.iloc[i]["title_display"], False):
+                new_df.drop(artist_rows.index[i])
+                print("Drop row with artist: ", artist_str, " and title: ", artist_rows.iloc[i]["title_display"])
+                total_drop += 1
+
+        if d:
+            date_str = date["date"]
+            # date = df["date_display"].apply(lambda x: Clean.check_if_similar(date_str, x, None))
+        print("Total dropped is ", total_drop)
+        return new_df
+
+
+
+
+    @staticmethod
+    def remove_match_images(data_path, input_csv, output_csv):
+        # read in csv
+        df = pandas.read_csv(input_csv, encoding='utf-8-sig')
+        df.set_index(['id'])
+        headers = list(df[:0])
+        dirs = os.listdir(data_path)
+        date = ""
+        for dir in dirs:
+            styles = os.listdir(os.path.join(data_path, dir))
+            for style in styles:
+                works = os.listdir(os.path.join(data_path, dir, style))
+                for work in works:
+                    print("work is ", work)
+                    strs = work.split("_")
+                    artist = strs[0]
+                    title = strs[1]
+                    split = title.rsplit("-", 1)
+                    print("split is ", split)
+                    if len(split) > 1:
+                        val = split[1].replace('.jpg', '')
+                        # if for case xxxx.jpg
+                        if re.match('^\d{4}$', val):
+                            date = val
+                            title = split[0]
+                        # elif for case where there is xxxx-x.jpg format where year is former
+                        elif re.match('^\d{4}$', split[0].rsplit("-", 1)[1]):
+                            date = split[0].rsplit("-", 1)[1]
+                            #TODO
+                        # else for case where there is no date xxxx
+                        else:
+                            title = strs[1].replace('.jpg', '')
+                    if date != "":
+                        df = Clean.check_if_true(df, artist, title, True, date=date)
+                    else:
+                        df = Clean.check_if_true(df, artist, title, False)
+        df.to_csv(output_csv, header=headers, index=False)
+        return df
 
 
 if __name__ == '__main__':
@@ -177,8 +267,7 @@ if __name__ == '__main__':
     data = Clean.assign_id(data, "agent_display")
     data.to_csv("./data/result_large.csv", header=headers, index=False)
     #print(headers)"""
-    Clean.find_artist_list(200,
-                           "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
-
+    #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
+    Clean.remove_match_images("../data/wiki_small", "../data/result_small.csv", "../data/filtered_large_from_small.csv" )
     # data = data.as_matrix()
     # print(data)
