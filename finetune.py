@@ -16,7 +16,7 @@ from cleaning.read_images import create_dir
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
-
+N_CLASSES = 25
 # Code influenced by keras application examples
 # that from rasta and from ...
 
@@ -55,6 +55,7 @@ def get_test1(input_shape, n_classes, pretrained=True):
 
     out = Sequential()
     out.add(Flatten(input_shape=base_model.output_shape[1:]))
+    out.add(Dropout(0.5))
     out.add(Dense(56, activation='relu'))
     out.add(Dense(n_classes, activation='softmax'))
 
@@ -116,126 +117,65 @@ get_model = {
 }
 
 
-def get_model_name(model_type, empty=False):
+def get_model_name(model_type, sample_no, empty=True, **kwargs):
     now = datetime.datetime.now()
-    name = model_type + '_'
+    name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
     if empty:
-        name = name + "empty_"
-    name = name + str(now.month) + '_' + str(now.day) + '-' + str(now.hour) + '_' + str(now.minute) + '_' + str(
-        now.second)
+        name = name + "_empty"
+    else:
+        name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
+        n_tune = kwargs["n_tune"]
+        name = name + '_tune-' + str(n_tune)
+    name = name + "-no-" + str(sample_no)
     return name
 
 
-"""
-def train_model(model_type, input_shape, n_classes, n_tune_layers, pretrained=True):
-    if not pretrained:
-        train_empty(model_type, )
+def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=True, save=True, **kwargs):
+    if not train_type:
+        path = kwargs["dir_path"]
+        name = kwargs["name"]
+        model = load_model(path)
+        n_tune = kwargs["n_tune"]
+        name = get_model_name(model_type, sample_no, empty=False, name=name, n_tune=n_tune)
+        for layer in model.layers[:len(model.layers) - n_tune]:
+            layer.trainable = False
+        for layer in model.layers[len(model.layers) - n_tune:]:
+            layer.trainable = True
+        dir_path = path
     else:
-        model = tune_output_layer(model_type, input_shape, n_classes, epochs)
-        tune_layers(n_tune_layers)
-    # method to tune top (n_tune_layers) layers of a model.
-    # get model with already trained new top output layer.
-    return null
-"""
-
-
-def fine_tune_trained_model_load(name, model_path, input_shape, n_tune_layers, train_path, val_path, horizontal_flip,
-                                 batch_size, epochs, save=True):
-    model = load_model(model_path)
-    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                    horizontal_flip=horizontal_flip)
-    val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                  horizontal_flip=horizontal_flip)
-    for layer in model.layers[:len(model.layers) - n_tune_layers]:
-        layer.trainable = False
-    for layer in model.layers[len(model.layers) - n_tune_layers:]:
-        layer.trainable = True
-    from tensorflow.keras.optimizers import SGD
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=["accuracy"])
-
-    # we train our model again (this time fine-tuning the top 2 inception blocks
-    # alongside the top Dense layers
-    model.fit_generator(
-        train_generator,
-        steps_per_epoch=count_files(train_path) // batch_size,
-        epochs=epochs,
-        validation_data=val_generator,
-        validation_steps=count_files(val_path) // batch_size
-    )
-    model.save(name + "_tuned_" + str(n_tune_layers) + ".h5py")
-    return
-
-
-def finetune_model_last_layer(model_type, input_shape, n_classes, train_path, horizontal_flip, batch_size,
-                              epochs, save=True):
-    # tune output layer
-    base_model, output = get_model[model_type](input_shape, n_classes, pretrained=True)
-    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                    horizontal_flip=horizontal_flip)
-    model = Model(inputs=base_model.input, outputs=output(base_model.output))  # output)
-
-    print("The total number of layers is", len(model.layers))
-    # for layer in base_model.layers:
-    #    layer.trainable = False
-
-    for layer in model.layers[:18]:
-        layer.trainable = False
-
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    name = get_model_name(model_type)
-    if save:
-        save_summary(name, model)
-    model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size, epochs=epochs)
-    model_path = name + "_last_layer.h5py"
-    model.save(model_path)
-    # either make a separate function tune_layers so just write it here
-    return name, model_path
-
-
-def train_empty(model_type, input_shape, n_classes, epochs, train_path, val_path, batch_size, horizontal_flip=True,
-                save=True):
-    base_model, output = get_model[model_type](input_shape, n_classes, pretrained=False)
-    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                    horizontal_flip=horizontal_flip)
-    model = Model(inputs=base_model.input, outputs=output(base_model.output))
-    print("created model")
-    #for layer in model.layers[:18]:
-     #   layer.trainable = False
+        base_model, output = get_model[model_type](input_shape, N_CLASSES, pretrained=False)
+        train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
+                                        horizontal_flip=horizontal_flip)
+        model = Model(inputs=base_model.input, outputs=output(base_model.output))
+        name = get_model_name(model_type, sample_no)
+        dir_path = join("models", name)
+        create_dir(dir_path)
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    name = get_model_name(model_type, empty=True)
     if save:
-        save_summary(name, model)
+        save_summary(dir_path, name, model)
     val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                   horizontal_flip=horizontal_flip)
-    create_dir(MODEL_DIR)
-    tb = TensorBoard(log_dir=MODEL_DIR+"/{}", histogram_freq=0, write_graph=True, write_images=True)
-    earlyStop = EarlyStopping(monitor='val_acc', patience=2)
-    if val_path!=None:
-        create_dir(join("models", name))
-        checkpoint = ModelCheckpoint(join("models", name, "{epoch:02d}-{val_acc:.2f}.hdf5"), monitor='val_acc',
+    tb = TensorBoard(log_dir=MODEL_DIR + "/{}", histogram_freq=0, write_graph=True, write_images=True)
+    earlyStop = EarlyStopping(monitor='val_acc', patience=5)
+    if val_path != None:
+
+        checkpoint = ModelCheckpoint(join("models", name, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                      verbose=1, save_best_only=True, mode='max')
-        history  = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
-                                       epochs=epochs, callbacks=[checkpoint, earlyStop], validation_data=val_generator,
-                                       validation_steps=count_files(val_path) // batch_size)
+        history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
+                                      epochs=epochs, callbacks=[checkpoint, earlyStop], validation_data=val_generator,
+                                      validation_steps=count_files(val_path) // batch_size)
     else:
-        history  = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
-                                       epochs=epochs)
+        history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
+                                      epochs=epochs)
 
-    #model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size, epochs=epochs,)
-     #                  # validation_data=val_generator,
-      #                  # validation_steps=count_files(val_path) // batch_size)
-    file_path = os.path.join(dirname, "models", name)
-    model.save(name+"_empty.h5py")
-    return file_path
+    model.save(join(dir_path, name + ".h5py"))
+    return name, dir_path
 
 
-# def tune_output_layer(model_type, input_shape, n_classes, epochs, train_path, val_path, horizontal_flip, batch_size, save):
-
-
-def save_summary(name, model):
+def save_summary(dir_path, name, model):
     file_name = name + '_' + "summary.txt"
-    file_path = "models/" + file_name
+    file_path = join(dir_path, file_name)
     with open(file_path, 'w+') as f:  # os.path.join(".", "models", file_name)
         with redirect_stdout(f):
             model.summary()
