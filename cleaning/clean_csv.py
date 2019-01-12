@@ -197,7 +197,7 @@ class Clean:
         return False
 
     @staticmethod
-    def check_if_true(df, sub_df, artist_str, title_str, d, **date):
+    def check_if_true(df, dropped_df, sub_df, artist_str, title_str, d, **date):
         if sub_df is not None and Clean.check_if_similar(sub_df[0]["agent_display"], artist_str, True):
             artist_rows = sub_df
         else:
@@ -206,7 +206,8 @@ class Clean:
         new_df = pandas.DataFrame.copy(df)
         for i in range(artist_rows.shape[0]):
             if Clean.check_if_similar(title_str, artist_rows.iloc[i]["title_display"], False):
-                new_df.drop(artist_rows.index[i])
+                dropped_df = dropped_df.append(artist_rows.iloc[i])
+                new_df.drop(artist_rows.index[i], inplace=True)
                 print("Drop row with artist: ", artist_str, " and title: ", artist_rows.iloc[i]["title_display"])
                 total_drop += 1
 
@@ -214,10 +215,10 @@ class Clean:
             date_str = date["date"]
             # date = df["date_display"].apply(lambda x: Clean.check_if_similar(date_str, x, None))
 
-        return new_df, sub_df, total_drop
+        return new_df, dropped_df, sub_df, total_drop
 
     @staticmethod
-    def remove_match_images(data_path, input_csv, output_csv):
+    def remove_match_images(data_path, input_csv, output_csv, dropped_csv):
         # read in csv
         df = pandas.read_csv(input_csv, encoding='utf-8-sig')
         df.set_index(['id'])
@@ -225,9 +226,11 @@ class Clean:
         dirs = os.listdir(data_path)
         date = ""
         sub_df = None
+        dropped_df = pandas.DataFrame(columns=headers)
         total_drop = 0
         for dir in dirs:
             styles = os.listdir(os.path.join(data_path, dir))
+            print("=========Dir type ", dir)
             for style in styles:
                 style_drop = 0
                 works = os.listdir(os.path.join(data_path, dir, style))
@@ -248,14 +251,16 @@ class Clean:
                             date = sub[1]
                             title = sub[0]
                     if date != "":
-                        df, sub_df, drop = Clean.check_if_true(df, sub_df, artist, title, True, date=date)
+                        df, dropped_df, sub_df, drop = Clean.check_if_true(df, dropped_df, sub_df, artist, title, True, date=date)
                     else:
-                        df, sub_df, drop = Clean.check_if_true(df, sub_df, artist, title, False)
+                        df, dropped_df, sub_df, drop = Clean.check_if_true(df, dropped_df, sub_df, artist, title, False)
                     style_drop += drop
-            total_drop += style_drop
-            print("Style " + style + " dropped: ", str(style_drop))
+                print("Style " + style + " dropped: ", str(style_drop))
+                total_drop += style_drop
+            print("Total for dir type ", dir,  " is ", str(total_drop))
         print("Total dropped is ", str(total_drop))
         df.to_csv(output_csv, header=headers, index=False)
+        dropped_df.to_csv(dropped_csv, header=headers, index=False)
         return df
 
     @staticmethod
@@ -300,7 +305,8 @@ if __name__ == '__main__':
     data.to_csv("./data/result_large.csv", header=headers, index=False)
     #print(headers)"""
     #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
-    Clean.remove_match_images("../data/wiki", "../data/result_small.csv", "../data/filtered_large_from_small.csv" )
+    Clean.remove_match_images("../data/wikipaintings_full", "../data/result_large.csv",
+                              "../data/filtered_full_large.csv", "../data/dropped_full_large.csv" )
 
 
 
