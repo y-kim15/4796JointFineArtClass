@@ -139,7 +139,7 @@ def _crosschannelnormalization(alpha = 1e-4, k=2, beta=0.75, n=5,**kwargs):
 
 if __name__ == '__main__':
     K.set_image_data_format('channels_first')
-    model = decaf6()
+    model = decaf()
     with open('./summary.txt', 'w') as f:
         orig_stdout = sys.stdout
         sys.stdout = f

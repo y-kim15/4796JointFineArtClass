@@ -18,7 +18,7 @@ from utils.utils import imagenet_preprocess_input,get_dico,wp_preprocess_input,i
 from keras import activations
 #from vis.utils import utils
 
-DEFAULT_MODEL_PATH='../models/resnet_2017_7_31-19_9_44(0)/model.h5'
+DEFAULT_MODEL_PATH='../models/resnet_2017_7_31-19_9_45/model.h5'
 DEFAULT_BAGGING=True
 DEFAULT_PREPROCESSING='imagenet'
 
