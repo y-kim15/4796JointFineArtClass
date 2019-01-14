@@ -1,12 +1,14 @@
 import shutil
-
+import tensorflow as tf
+import keras
+from keras_tqdm import TQDMCallback
+from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
-from tensorflow.keras.applications.inception_v3 import InceptionV3
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Model, Sequential, load_model
-from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling2D, Flatten, Conv2D, MaxPooling2D, ZeroPadding2D, Dropout, Activation
-from rasta.python.utils.utils import wp_preprocess_input
+from keras.applications.inception_v3 import InceptionV3
+from keras.applications.vgg16 import VGG16
+from keras.preprocessing.image import ImageDataGenerator
+from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D
+from keras.optimizers import Adam
 from rasta.python.models.processing import count_files
 from contextlib import redirect_stdout
 import datetime
@@ -21,7 +23,7 @@ N_CLASSES = 25
 # that from rasta and from ...
 
 
-def get_alexnet(input_shape, n_classes=25):
+def get_alexnet(input_shape):
         inputs = Input(shape=(227, 227, 3))
 
         conv_1 = Conv2D(96, (11, 11), strides=(4, 4),  activation='relu', name='conv_1',
@@ -36,33 +38,34 @@ def get_alexnet(input_shape, n_classes=25):
         x.add(Dropout(0.5))
         x.add(Dense(256, activation='relu'))
         x.add(Dropout(0.5))
-        x.add(Dense(n_classes, activation='softmax'))
+        x.add(Dense(N_CLASSES, activation='softmax'))
 
         alexnet = x
         alexnet.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         print(alexnet.summary())
 
-def get_test1(input_shape, n_classes, pretrained=True):
-    from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Dropout, Input
+
+def get_test1(input_shape, pretrained):
 
     base_model = Sequential()
-    base_model.add(Conv2D(64, (7, 7), strides=(4, 4), input_shape=input_shape, activation='relu', padding='valid'))
-    base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(InputLayer(input_shape))
+    base_model.add(Conv2D(64, (7, 7), strides=(4, 4), activation='relu', padding='valid'))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
     base_model.add(Conv2D(128, (5, 5), strides=(2, 2), activation='relu'))
-    base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
     base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu'))
-    base_model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
 
-    out = Sequential()
-    out.add(Flatten(input_shape=base_model.output_shape[1:]))
-    out.add(Dropout(0.5))
-    out.add(Dense(56, activation='relu'))
-    out.add(Dense(n_classes, activation='softmax'))
+    #out = Sequential()
+    base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
+    base_model.add(Dropout(0.5))
+    base_model.add(Dense(56, activation='relu'))
+    base_model.add(Dense(N_CLASSES, activation='softmax'))
 
-    return base_model, out
+    return base_model
 
 
-def get_vgg16(input_shape, n_classes, pretrained=True):
+def get_vgg16(input_shape, pretrained=True):
     if not pretrained:
         base_model = VGG16(include_top=False, weights=None, input_shape=input_shape)
         # return base_model
@@ -75,7 +78,7 @@ def get_vgg16(input_shape, n_classes, pretrained=True):
     # x.add(Dropout(0.5))
     x.add(Dense(512, activation='relu'))
     # x.add(Dropout(0.5))
-    x.add(Dense(n_classes, activation='softmax'))
+    x.add(Dense(N_CLASSES, activation='softmax'))
     return base_model, x
 
     # model = Model(input=base_model.input, output=x(base_model.output))
@@ -93,7 +96,7 @@ def get_vgg16(input_shape, n_classes, pretrained=True):
     # return base_model, x
 
 
-def get_inceptionv3(input_shape, n_classes, pretrained=True):
+def get_inceptionv3(input_shape, pretrained=True):
     if not pretrained:
         base_model = InceptionV3(include_top=True, weights=None, input_shape=input_shape)
 
@@ -105,7 +108,7 @@ def get_inceptionv3(input_shape, n_classes, pretrained=True):
     # let's add a fully-connected layer
     x = Dense(1024, activation='relu')(x)
     # and a logistic layer -- let's say we have 200 classes
-    output = Dense(n_classes, activation='softmax')(x)
+    output = Dense(N_CLASSES, activation='softmax')(x)
 
     return base_model, output
 
@@ -129,8 +132,12 @@ def get_model_name(model_type, sample_no, empty=True, **kwargs):
     name = name + "-no-" + str(sample_no)
     return name
 
-
+    # train_type: T for empty, F for retrain existing
 def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=True, save=True, **kwargs):
+    if model_type == "vgg":
+        pre_type = True
+    else:
+        pre_type = False
     if not train_type:
         path = kwargs["dir_path"]
         name = kwargs["name"]
@@ -143,27 +150,27 @@ def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size,
             layer.trainable = True
         dir_path = path
     else:
-        base_model, output = get_model[model_type](input_shape, N_CLASSES, pretrained=False)
-        train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                        horizontal_flip=horizontal_flip)
-        model = Model(inputs=base_model.input, outputs=output(base_model.output))
+        base_model = get_model[model_type](input_shape, pretrained=False)
+        model = Model(inputs=base_model.input, outputs=base_model.output)
         name = get_model_name(model_type, sample_no)
         dir_path = join("models", name)
         create_dir(dir_path)
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
+                                    horizontal_flip=horizontal_flip, pre_type=pre_type)
+    model.compile(optimizer=Adam(lr=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 
     if save:
         save_summary(dir_path, name, model)
     val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                  horizontal_flip=horizontal_flip)
-    tb = TensorBoard(log_dir=MODEL_DIR + "/{}", histogram_freq=0, write_graph=True, write_images=True)
+                                  horizontal_flip=horizontal_flip, pre_type=pre_type)
+    tb = TensorBoard(log_dir=MODEL_DIR + "/graph", histogram_freq=0, write_graph=True, write_images=True)
     earlyStop = EarlyStopping(monitor='val_acc', patience=5)
     if val_path != None:
 
         checkpoint = ModelCheckpoint(join("models", name, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                      verbose=1, save_best_only=True, mode='max')
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
-                                      epochs=epochs, callbacks=[checkpoint, earlyStop], validation_data=val_generator,
+                                      epochs=epochs, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
                                       validation_steps=count_files(val_path) // batch_size)
     else:
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
@@ -181,12 +188,37 @@ def save_summary(dir_path, name, model):
             model.summary()
 
 
-def get_generator(path, batch_size, target_size, horizontal_flip):
-    datagen = ImageDataGenerator(horizontal_flip=horizontal_flip,
-                                 preprocessing_function=wp_preprocess_input)
+def vgg_preprocess_input(x):
+    # 'RGB'->'BGR'
+    x = x[:, :, ::-1]
+
+    x[:,:,0] -=  133.104
+    x[:,:,0] -=  119.973
+    x[:,:,0] -=  104.432
+
+    return x
+
+
+def wp_preprocess_input(x):
+
+    x[:, :, 0] -= 133.104
+    x[:, :, 0] -= 119.973
+    x[:, :, 0] -= 104.432
+
+    return x
+
+
+def get_generator(path, batch_size, target_size, horizontal_flip, pre_type):
+    if pre_type:
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=vgg_preprocess_input)
+    else:
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=wp_preprocess_input)
+
     generator = datagen.flow_from_directory(
         path,
         target_size=target_size,
         batch_size=batch_size,
         class_mode='categorical')
     return generator
+
+
