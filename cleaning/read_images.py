@@ -1,5 +1,5 @@
 import shutil, os
-import time
+import re
 import pandas
 import csv
 from cleaning.clean_csv import Clean
@@ -148,10 +148,28 @@ def enumerate_class_names(name, path):
         i += 1
     f.close()
 
+def get_image_details(file_name):
+    splits = file_name.split('_')
+    artist = splits[0]
+    date = ''
+    title = splits[1].replace('.jpg', '')
+    sub = title.rsplit("-", 1)
+    if len(sub) > 1:
+        # if for case xxxx.jpg
+        if re.match('^\d{4}$', sub[1]):
+            date = sub[1]
+            title = sub[0]
+        # elif for case where there is xxxx-x.jpg format where year is former
+        elif len(sub[0].rsplit("-", 1)) > 1 and re.match('^\d{4}$', sub[0].rsplit("-", 1)[1]):
+            sub_sub = sub[0].rsplit("-", 1)
+            date = sub_sub[1]
+            title = sub_sub[0] + '-' + sub[1]
+
+    return artist, date, title
 
 def generate_image_id_file(name, path, class_file_path, id=True):
     # class_file_path: path where class label file is
-    # path: path of parent directory containing all data (e.g. wikipaintings_train)
+    # path: path of parent directory containing all data (e.g. wikipaintings_full)
     # name: path of output file
     # generates file with list of absolute path of images with its class label as csv with code included
     # class label order indexed from 0 determined from class_label.txt file generated
@@ -160,25 +178,29 @@ def generate_image_id_file(name, path, class_file_path, id=True):
     class_f = open(class_file_path, "r")
     lines = class_f.read().split('\n')
     if not id:
-        headers = ["path", "label"]
+        headers = ["agent_display", "date_display", "title_display", "label", "path"]
     else:
-        headers = ["id", "path", "label", "class_name"]
+        headers = ["id_agent", "id_count", "agent_display", "date_display", "title_display", "label", "class", "path"]
     new_f = pandas.DataFrame(columns=headers)
 
-    dirs = sorted(os.listdir(path))
-    i = 0
-    for dir in dirs:
-        files = sorted(os.listdir(os.path.join(path, dir)))
-        print("In Directory: ", str(dir))
-        for file in files:
-            file_path = os.path.join("..", "rasta", "data", "wikipaintings_full", "wikipaintings_train", dir, file)
-            if not id:
-                new_f.loc[i] = [file_path, str(lines.index(dir))]
-            else:
-                new_f.loc[i] = ["NaN", file_path, str(lines.index(dir)), str(dir)]
-            i += 1
+    upper_dirs = sorted(os.listdir(path))
+    for middle in upper_dirs:
+        middle_path = os.path.join(path, middle)
+        dirs = sorted(os.listdir(middle_path))
+        i = 0
+        for dir in dirs:
+            files = sorted(os.listdir(os.path.join(middle_path, dir)))
+            print("In Directory: ", str(dir))
+            for file in files:
+                artist, date, title = get_image_details(file)
+                file_path = os.path.join(middle_path, dir, file)
+                if not id:
+                    new_f.loc[i] = [artist, date, title, str(lines.index(dir)), file_path]
+                else:
+                    new_f.loc[i] = ["NaN", "NaN", artist, date, title, str(lines.index(dir)), str(dir), file_path]
+                i += 1
 
-    new_f = Clean.assign_id(new_f, "label")
+    new_f = Clean.assign_id(new_f, "agent_display")
     if not id:
         new_f.to_csv(name, sep=" ", quoting=csv.QUOTE_NONE, escapechar=" ", header=False, index=False)
     else:
@@ -193,7 +215,7 @@ def shuffle_data(train_path, new_path):
         for _, line in data:
             target.write(line)
 
-
+# creates file system where images are grouped by artist dir
 def generate_artist_file_system(path, dest_path):
     if os.path.exists(dest_path):
         shutil.rmtree(dest_path)
@@ -227,10 +249,13 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "../data/wikipaintings_full"
-    dest_path = "../data/wiki_small"
-    cur_time = time.strftime("%d%m%y_%H%M")
-    get_small_from_large_dataset(path, 0.1, dest_path, "../summary_"+cur_time+".txt")
+    #path = "../data/wikipaintings_full"
+    #dest_path = "../data/wiki_small"
+    #cur_time = time.strftime("%d%m%y_%H%M")
+    #get_small_from_large_dataset(path, 0.1, dest_path, "../summary_"+cur_time+".txt")
+    class_path = "../data/wikipaintings_class_labels.txt"
+    generate_image_id_file("../data/wikipaintings_full_image.csv", "../data/wikipaintings_full", class_path)
+
 
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"

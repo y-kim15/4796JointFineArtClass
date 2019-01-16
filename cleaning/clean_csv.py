@@ -59,32 +59,44 @@ class Clean:
         return new_data
 
     @staticmethod
-    def assign_id(data, col_name):
+    def assign_id(df, col_name):
         # creates unique id for every row in format of xx-yy where xx for artist
         # yy for work count of an artist
         # col_name to generate the code on
-        new_data = pandas.DataFrame.copy(data)  # MIGHT NOT NEED THIS
+        new_data = pandas.DataFrame.copy(df)  # MIGHT NOT NEED THIS
         i = 0  # total
         current = ""  # current artist
         current_i = 0  # current artist count
         current_j = 0  # current artist work count
         # for(new, old) in zip (new_data["agent_display"], data["agent_display"]):
-        for old in data[col_name]:
-            if i == 0:
-                current_i += 1
+        artist_count = {}
+        work_count = {}
+        temp_i = -1
+        for old in df[col_name]:
+            if old == current:
                 current_j += 1
-                current = old
             else:
-                if old == current:
-                    current_j += 1
+                temp_i = current_i
+                if old in artist_count:
+                    current_i = artist_count[old]
+                    current_j = work_count[current_i] + 1
                 else:
-                    current_i += 1
+                    work_count[current_i] = current_j
+                    current_i = temp_i + 1
                     current_j = 1
-                    current = old
+                    artist_count[old] = current_i
+                current = old
+            work_count[current_i] = current_j
             new = str(current_i) + "-" + str(current_j)
-            data.iloc[i]["id"] = new
+            new_data.id_agent[i] = current_i
+            new_data.id_count[i] = current_j
+            #new_data.iloc[i, "id_agent"] = current_i
+            #new_data.iloc[i, "id_count"] = current_j
             i += 1
-        return data
+
+        new_data.id_agent = new_data.id_agent.astype(int)
+        new_data.id_count = new_data.id_count.astype(int)
+        return new_data
 
     @staticmethod
     # https://www.bogotobogo.com/python/python_longest_common_substring_lcs_algorithm_generalized_suffix_tree.php
@@ -305,8 +317,11 @@ if __name__ == '__main__':
     data.to_csv("./data/result_large.csv", header=headers, index=False)
     #print(headers)"""
     #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
-    Clean.remove_match_images("../data/wikipaintings_full", "../data/result_large.csv",
-                              "../data/filtered_full_large.csv", "../data/dropped_full_large.csv" )
-
+    #Clean.remove_match_images("../data/wikipaintings_full", "../data/result_large.csv",
+     #                         "../data/filtered_full_large.csv", "../data/dropped_full_large.csv" )
+    data = pandas.read_csv("../data/filtered_full_large.csv", header=0)
+    headers = list(data[:0])
+    data = Clean.assign_id(data, "agent_display")
+    data.to_csv("../data/filtered_full_large1.csv", header=headers, index=False)
 
 
