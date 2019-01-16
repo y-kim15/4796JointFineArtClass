@@ -35,6 +35,11 @@ flip = args.horizontal_flip
 N_TUNE = args.n_layers_trainable
 SAMPLE_N = args.sample_n
 
+TRAIN_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smallval")
+
+INPUT_SHAPE = (224, 224, 3)
+
 if train_type != 'empty':
     TRAIN_TYPE = False
     if args.model_path is None:
@@ -42,18 +47,17 @@ if train_type != 'empty':
     else:
         MODEL_PATH = args.model_path
     MODEL_TYPE = None
+    fit_model(MODEL_TYPE, INPUT_SHAPE, N_EPOCHS, TRAIN_PATH, VAL_PATH, BATCH_SIZE, SAMPLE_N, TRAIN_TYPE, dir_path=MODEL_PATH, name="test1-empty", n_tune=N_TUNE)
 else:
     TRAIN_TYPE = True
     MODEL_TYPE = args.model_type
     MODEL_PATH = None
+    fit_model(MODEL_TYPE, INPUT_SHAPE, N_EPOCHS, TRAIN_PATH, VAL_PATH, BATCH_SIZE, SAMPLE_N, TRAIN_TYPE,
+              horizontal_flip=flip)
 
 params = vars(args)
 
-TRAIN_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smallval")
 
-INPUT_SHAPE = (224, 224, 3)
-fit_model(MODEL_TYPE, INPUT_SHAPE, N_EPOCHS, TRAIN_PATH, VAL_PATH, BATCH_SIZE, SAMPLE_N, TRAIN_TYPE, horizontal_flip=flip)
 
 #name, model_path = finetune.train_empty(model_type=MODEL_TYPE, input_shape=INPUT_SHAPE, epochs=N_EPOCHS, train_path=TRAIN_PATH, val_path=VAL_PATH, batch_size=BATCH_SIZE)
 name = "test1_empty_1_12-15_0_10_empty.h5py_tuned_5.h5py"

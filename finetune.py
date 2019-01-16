@@ -114,6 +114,8 @@ def get_model_name(sample_no, empty=True, **kwargs):
     else:
         name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
         n_tune = kwargs["n_tune"]
+        if n_tune == 0:
+            n_tune = 'full1'
         name = name + '_tune-' + str(n_tune)
     name = name + "-no-" + str(sample_no)
     return name
@@ -123,15 +125,17 @@ def get_model_name(sample_no, empty=True, **kwargs):
 def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=False, save=True, **kwargs):
     if not train_type:
         path = kwargs["dir_path"]
-        name = kwargs["name"]
+        name = kwargs["name"].replace(".hdf5", '')  # + path.rsplit('/', 1)[1]
         model = load_model(path)
         n_tune = kwargs["n_tune"]
         name = get_model_name(sample_no, empty=False, name=name, n_tune=n_tune)
-        for layer in model.layers[:len(model.layers) - n_tune]:
-            layer.trainable = False
-        for layer in model.layers[len(model.layers) - n_tune:]:
-            layer.trainable = True
-        dir_path = path
+        if n_tune > 0:
+            for layer in model.layers[:len(model.layers) - n_tune]:
+                layer.trainable = False
+            for layer in model.layers[len(model.layers) - n_tune:]:
+                layer.trainable = True
+        dir_path = join(path.rsplit('/', 1)[0], name)
+        create_dir(dir_path)
     else:
         base_model = get_model[model_type](input_shape, pretrained=True)
         model = Model(inputs=base_model.input, outputs=base_model.output)
@@ -161,7 +165,7 @@ def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size,
     earlyStop = EarlyStopping(monitor='val_acc', patience=5)
     if val_path != None:
 
-        checkpoint = ModelCheckpoint(join("models", name, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
+        checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                      verbose=1, save_best_only=True, mode='max')
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
                                       epochs=epochs, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
