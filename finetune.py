@@ -1,14 +1,12 @@
-import shutil
-import tensorflow as tf
-import keras
-from keras_tqdm import TQDMCallback
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
 from keras.applications.inception_v3 import InceptionV3
-from keras.applications.vgg16 import VGG16
+from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.initializers import glorot_uniform
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D
 from keras.optimizers import Adam
+from keras.utils import multi_gpu_model
 from rasta.python.models.processing import count_files
 from contextlib import redirect_stdout
 import datetime
@@ -49,18 +47,18 @@ def get_test1(input_shape, pretrained):
 
     base_model = Sequential()
     base_model.add(InputLayer(input_shape))
-    base_model.add(Conv2D(64, (7, 7), strides=(4, 4), activation='relu', padding='valid'))
+    base_model.add(Conv2D(64, (7, 7), strides=(4, 4), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    base_model.add(Conv2D(128, (5, 5), strides=(2, 2), activation='relu'))
+    base_model.add(Conv2D(128, (5, 5), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu'))
+    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
 
     #out = Sequential()
     base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
     base_model.add(Dropout(0.5))
-    base_model.add(Dense(56, activation='relu'))
-    base_model.add(Dense(N_CLASSES, activation='softmax'))
+    base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(1)))
+    base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(1)))
 
     return base_model
 
@@ -80,20 +78,6 @@ def get_vgg16(input_shape, pretrained=True):
     # x.add(Dropout(0.5))
     x.add(Dense(N_CLASSES, activation='softmax'))
     return base_model, x
-
-    # model = Model(input=base_model.input, output=x(base_model.output))
-
-    # x = base_model.output
-    # x = Dense(4096, activation='relu')(x)
-    # x = Dropout(0.5)(x)
-    # x = Dense(4096, activation='relu')(x)
-    # x = Dropout(0.5)(x)
-    # output = Dense(n_classes, activation='softmax')(x)
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    # model.add(Dense(num_class, activation='softmax'))
-
-    # return base_model, x
 
 
 def get_inceptionv3(input_shape, pretrained=True):
@@ -120,11 +104,13 @@ get_model = {
 }
 
 
-def get_model_name(model_type, sample_no, empty=True, **kwargs):
-    now = datetime.datetime.now()
-    name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
+def get_model_name(sample_no, empty=True, **kwargs):
     if empty:
+        model_type = kwargs["model_type"]
+        now = datetime.datetime.now()
+        name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
         name = name + "_empty"
+
     else:
         name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
         n_tune = kwargs["n_tune"]
@@ -132,38 +118,46 @@ def get_model_name(model_type, sample_no, empty=True, **kwargs):
     name = name + "-no-" + str(sample_no)
     return name
 
+
     # train_type: T for empty, F for retrain existing
-def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=True, save=True, **kwargs):
-    if model_type == "vgg":
-        pre_type = True
-    else:
-        pre_type = False
+def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=False, save=True, **kwargs):
     if not train_type:
         path = kwargs["dir_path"]
         name = kwargs["name"]
         model = load_model(path)
         n_tune = kwargs["n_tune"]
-        name = get_model_name(model_type, sample_no, empty=False, name=name, n_tune=n_tune)
+        name = get_model_name(sample_no, empty=False, name=name, n_tune=n_tune)
         for layer in model.layers[:len(model.layers) - n_tune]:
             layer.trainable = False
         for layer in model.layers[len(model.layers) - n_tune:]:
             layer.trainable = True
         dir_path = path
     else:
-        base_model = get_model[model_type](input_shape, pretrained=False)
+        base_model = get_model[model_type](input_shape, pretrained=True)
         model = Model(inputs=base_model.input, outputs=base_model.output)
-        name = get_model_name(model_type, sample_no)
+        name = get_model_name(sample_no, model_type=model_type)
         dir_path = join("models", name)
         create_dir(dir_path)
+
+    if model_type == "vgg":
+        pre_type = True
+    else:
+        pre_type = False
     train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                     horizontal_flip=horizontal_flip, pre_type=pre_type)
+    try:
+        model = multi_gpu_model(model)
+    except:
+        pass
     model.compile(optimizer=Adam(lr=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 
     if save:
         save_summary(dir_path, name, model)
+        with open(join(dir_path, name+'.json'), 'w') as json_file:
+            json_file.write(model.to_json())
     val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
                                   horizontal_flip=horizontal_flip, pre_type=pre_type)
-    tb = TensorBoard(log_dir=MODEL_DIR + "/graph", histogram_freq=0, write_graph=True, write_images=True)
+    tb = TensorBoard(log_dir=MODEL_DIR + "/{}", histogram_freq=0, write_graph=True, write_images=True)
     earlyStop = EarlyStopping(monitor='val_acc', patience=5)
     if val_path != None:
 
@@ -176,7 +170,7 @@ def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size,
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
                                       epochs=epochs)
 
-    model.save(join(dir_path, name + ".h5py"))
+    model.save(join(dir_path, name + ".hdf5"))
     return name, dir_path
 
 
@@ -195,6 +189,8 @@ def vgg_preprocess_input(x):
     x[:,:,0] -=  133.104
     x[:,:,0] -=  119.973
     x[:,:,0] -=  104.432
+
+    # x = preprocess_input(x)
 
     return x
 
