@@ -151,6 +151,7 @@ def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size,
                                     horizontal_flip=horizontal_flip, pre_type=pre_type)
     try:
         model = multi_gpu_model(model)
+        print("multi gpu enabled")
     except:
         pass
     model.compile(optimizer=Adam(lr=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
