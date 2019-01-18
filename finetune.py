@@ -1,18 +1,17 @@
-from keras.models import Sequential, Model, load_model
-from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
+from keras.models import Sequential
 from keras.applications.inception_v3 import InceptionV3
 from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D
-from keras.optimizers import Adam
-from keras.utils import multi_gpu_model
-from rasta.python.models.processing import count_files
+from keras.optimizers import Adam, RMSprop, Adadelta
 from contextlib import redirect_stdout
 import datetime
 import os
 from os.path import join
-from cleaning.read_images import create_dir
+import math
+
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
@@ -90,16 +89,29 @@ def get_inceptionv3(input_shape, pretrained=True):
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     # let's add a fully-connected layer
-    x = Dense(1024, activation='relu')(x)
+    x = Dense(512, activation='relu')(x)
     # and a logistic layer -- let's say we have 200 classes
     output = Dense(N_CLASSES, activation='softmax')(x)
 
     return base_model, output
 
 
+def get_resnet50(input_shape, pretrained=True):
+    if not pretrained:
+        base_model = ResNet50(input_shape=input_shape, weights=None, include_top=True)
+    else:
+        base_model = ResNet50(input_shape=input_shape, weights='imagenet', include_top=False)
+
+    x = base_model.output
+    x = GlobalAveragePooling2D(data_format='channels_last')(x)
+    output = Dense(N_CLASSES, activation='softmax')(x)
+    return base_model, output
+
+
 get_model = {
     "inceptionv3": get_inceptionv3,
     "vgg16": get_vgg16,
+    "resnet50": get_resnet50,
     "test1": get_test1
 }
 
@@ -119,65 +131,6 @@ def get_model_name(sample_no, empty=True, **kwargs):
         name = name + '_tune-' + str(n_tune)
     name = name + "-no-" + str(sample_no)
     return name
-
-
-    # train_type: T for empty, F for retrain existing
-def fit_model(model_type, input_shape, epochs, train_path, val_path, batch_size, sample_no, train_type, horizontal_flip=False, save=True, **kwargs):
-    if not train_type:
-        path = kwargs["dir_path"]
-        name = kwargs["name"].replace(".hdf5", '')  # + path.rsplit('/', 1)[1]
-        model = load_model(path)
-        n_tune = kwargs["n_tune"]
-        name = get_model_name(sample_no, empty=False, name=name, n_tune=n_tune)
-        if n_tune > 0:
-            for layer in model.layers[:len(model.layers) - n_tune]:
-                layer.trainable = False
-            for layer in model.layers[len(model.layers) - n_tune:]:
-                layer.trainable = True
-        dir_path = join(path.rsplit('/', 1)[0], name)
-        create_dir(dir_path)
-    else:
-        base_model = get_model[model_type](input_shape, pretrained=True)
-        model = Model(inputs=base_model.input, outputs=base_model.output)
-        name = get_model_name(sample_no, model_type=model_type)
-        dir_path = join("models", name)
-        create_dir(dir_path)
-
-    if model_type == "vgg":
-        pre_type = True
-    else:
-        pre_type = False
-    train_generator = get_generator(train_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                    horizontal_flip=horizontal_flip, pre_type=pre_type)
-    try:
-        model = multi_gpu_model(model)
-        print("multi gpu enabled")
-    except:
-        pass
-    model.compile(optimizer=Adam(lr=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
-
-    if save:
-        save_summary(dir_path, name, model)
-        with open(join(dir_path, name+'.json'), 'w') as json_file:
-            json_file.write(model.to_json())
-    val_generator = get_generator(val_path, batch_size, target_size=(input_shape[0], input_shape[1]),
-                                  horizontal_flip=horizontal_flip, pre_type=pre_type)
-    tb = TensorBoard(log_dir=MODEL_DIR + "/{}", histogram_freq=0, write_graph=True, write_images=True)
-    earlyStop = EarlyStopping(monitor='val_acc', patience=5)
-    if val_path != None:
-
-        checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
-                                     verbose=1, save_best_only=True, mode='max')
-        history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
-                                      epochs=epochs, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
-                                      validation_steps=count_files(val_path) // batch_size)
-    else:
-        history = model.fit_generator(train_generator, steps_per_epoch=count_files(train_path) // batch_size,
-                                      epochs=epochs)
-
-    model.save(join(dir_path, name + ".hdf5"))
-    return name, dir_path
-
 
 def save_summary(dir_path, name, model):
     file_name = name + '_' + "summary.txt"
@@ -221,5 +174,32 @@ def get_generator(path, batch_size, target_size, horizontal_flip, pre_type):
         batch_size=batch_size,
         class_mode='categorical')
     return generator
+
+
+# learning rate schedule
+def step_decay(epoch):
+    initial_lrate = 0.1
+    drop = 0.5
+    epochs_drop = 10.0
+    lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
+    return lrate
+
+
+optimiser = {
+    'adam': Adam,
+    'rmsprop': RMSprop,
+    'adadelta': Adadelta
+}
+
+
+def get_optimiser(opt, lr, decay):
+    if decay.isdigit():
+        return optimiser[opt](lr=lr, decay=decay)
+    else:
+        return optimiser[opt](lr=lr)
+
+
+
+
 
 

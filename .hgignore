@@ -1,4 +1,4 @@
-data/wiki*
+data/wiki_*
 rasta/python/__pycache__
 rasta/python/models/__pycache__
 rasta/python/utils/__pycache__
