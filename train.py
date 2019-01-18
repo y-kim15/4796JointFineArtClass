@@ -5,7 +5,7 @@ import argparse
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.utils import multi_gpu_model
-from finetune import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser
+from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser
 from rasta.python.models.processing import count_files
 from cleaning.read_images import create_dir
 
