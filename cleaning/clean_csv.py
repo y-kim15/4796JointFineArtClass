@@ -298,6 +298,44 @@ class Clean:
                 time.sleep(1)
         return df
 
+    @staticmethod
+    def convert_name_order(df, col_name):
+        new_df = pandas.DataFrame.copy(df)
+        i = 0
+        for names in df[col_name]:
+            split = names.split('-')
+            if len(split) == 2:
+                name = split[1] + '-' + split[0]
+            elif len(split) > 2:
+                re = names.rsplit('-', 1)
+                name = re[1] + '-' + re[0]
+            else:
+                name = names
+            new_df.agent_display[i] = name
+            i += 1
+        return new_df
+
+    @staticmethod
+    def filter_artists(wiki_csv, id_csv, target_id_csv):
+        # method to get works by artists only in wiki from ID images
+        wiki_df = pandas.read_csv(wiki_csv, header=0)
+        id_df = pandas.read_csv(id_csv, header=0)
+        headers = list(id_df[:0])
+        new_id = pandas.DataFrame(columns=headers)
+        art_list = []
+        for artist in wiki_df['agent_display']:
+            print("artist is ", artist)
+            if artist not in art_list:
+                art_list = art_list.append(artist)
+                sur = artist.rsplit('-', 1)[1]
+                rows = id_df.loc[id_df["agent_display"].str.contains(sur)]
+                if len(rows) > 0:
+                    new_id = new_id.append(rows)
+            else:
+                pass
+        pass
+        new_id.to_csv(target_id_csv, header=headers, index=False)
+
 
 
 if __name__ == '__main__':
@@ -319,9 +357,10 @@ if __name__ == '__main__':
     #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
     #Clean.remove_match_images("../data/wikipaintings_full", "../data/result_large.csv",
      #                         "../data/filtered_full_large.csv", "../data/dropped_full_large.csv" )
-    data = pandas.read_csv("../data/filtered_full_large.csv", header=0)
-    headers = list(data[:0])
-    data = Clean.assign_id(data, "agent_display")
-    data.to_csv("../data/filtered_full_large1.csv", header=headers, index=False)
-
+    #data = pandas.read_csv("../data/filtered_full_large1.csv", header=0)
+    #headers = list(data[:0])
+    #data = Clean.assign_id(data, "agent_display")
+    #data = Clean.convert_name_order(data, "agent_display")
+    #data.to_csv("../data/id_full_large.csv", header=headers, index=False)
+    Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
 

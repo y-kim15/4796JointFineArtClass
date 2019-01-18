@@ -28,10 +28,11 @@ parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',hel
 parser.add_argument('-f', action="store", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not [True|False]')
 parser.add_argument('-n', action="store", default=0, type=int,dest='n_layers_trainable',help='Set the number of last trainable layers')
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 10), metavar='[0-9]', help='Sample Number to use [0-9]')
-parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta]')
+parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
 parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|rate_v|step]')
 parser.add_argument('-r', action="store", default='none', dest='add_regul', help='Add regularisation in Conv layers [none|l1|l2]')
+parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
 
 args = parser.parse_args()
 print("Args: ", args)
@@ -46,6 +47,9 @@ SAMPLE_N = args.sample_n
 OPT = args.optimiser
 LR = args.lr
 DECAY = args.add_decay
+MOM = args.add_mom
+if OPT != 'sgd':
+    print("Warning: chosen optimiser is not SGD, momentum value is ignored.")
 
 
 TRAIN_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
@@ -62,21 +66,25 @@ if train_type != 'empty':
     name = MODEL_PATH.rsplit('/', 1)[1].replace('hdf5', '')
     model = load_model(MODEL_PATH)
     name = get_model_name(SAMPLE_N, empty=False, name=name, n_tune=N_TUNE)
-    if N_TUNE > 0:
-        for layer in model.layers[:len(model.layers) - N_TUNE]:
-            layer.trainable = False
-        for layer in model.layers[len(model.layers) - N_TUNE:]:
-            layer.trainable = True
     dir_path = join(MODEL_PATH.rsplit('/', 1)[0], name)
     create_dir(dir_path)
 else:
     MODEL_TYPE = args.model_type
     MODEL_PATH = None
-    base_model = get_model[MODEL_TYPE](INPUT_SHAPE, pretrained=True)
-    model = Model(inputs=base_model.input, outputs=base_model.output)
-    name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE)
+    base_model, output = get_model[MODEL_TYPE](INPUT_SHAPE, pretrained=True)
+    if MODEL_TYPE == 'test1':
+        model = Model(inputs=base_model.input, outputs=base_model.output)
+    else:
+        model = Model(inputs=base_model.input, outputs=output(base_model.output))
+    name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE, n_tune=N_TUNE)
     dir_path = join("models", name)
     create_dir(dir_path)
+
+if N_TUNE > 0:
+    for layer in model.layers[:len(model.layers) - N_TUNE]:
+        layer.trainable = False
+    for layer in model.layers[len(model.layers) - N_TUNE:]:
+        layer.trainable = True
 
 params = vars(args)
 
@@ -92,7 +100,7 @@ try:
 except:
     pass
 
-model.compile(optimizer=get_optimiser(OPT, LR, DECAY), loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM), loss='categorical_crossentropy', metrics=['accuracy'])
 
 save_summary(dir_path, name, model)
 with open(join(dir_path, name + '.json'), 'w') as json_file:

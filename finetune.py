@@ -5,7 +5,7 @@ from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D
-from keras.optimizers import Adam, RMSprop, Adadelta
+from keras.optimizers import Adam, RMSprop, Adadelta, SGD
 from contextlib import redirect_stdout
 import datetime
 import os
@@ -59,7 +59,7 @@ def get_test1(input_shape, pretrained):
     base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(1)))
     base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(1)))
 
-    return base_model
+    return base_model, base_model.output
 
 
 def get_vgg16(input_shape, pretrained=True):
@@ -71,9 +71,9 @@ def get_vgg16(input_shape, pretrained=True):
 
     x = Sequential()
     x.add(Flatten(input_shape=base_model.output_shape[1:]))
-    x.add(Dense(512, activation='relu'))
+    #x.add(Dense(256, activation='relu'))
     # x.add(Dropout(0.5))
-    x.add(Dense(512, activation='relu'))
+    #x.add(Dense(512, activation='relu'))
     # x.add(Dropout(0.5))
     x.add(Dense(N_CLASSES, activation='softmax'))
     return base_model, x
@@ -116,7 +116,7 @@ get_model = {
 }
 
 
-def get_model_name(sample_no, empty=True, **kwargs):
+def get_model_name(sample_no, empty=True, n_tune=0, **kwargs):
     if empty:
         model_type = kwargs["model_type"]
         now = datetime.datetime.now()
@@ -125,10 +125,11 @@ def get_model_name(sample_no, empty=True, **kwargs):
 
     else:
         name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
-        n_tune = kwargs["n_tune"]
-        if n_tune == 0:
-            n_tune = 'full1'
-        name = name + '_tune-' + str(n_tune)
+    if n_tune == 0:
+        tune = 'full1'
+    else:
+        tune = str(n_tune)
+    name = name + '_tune-' + tune
     name = name + "-no-" + str(sample_no)
     return name
 
@@ -188,15 +189,23 @@ def step_decay(epoch):
 optimiser = {
     'adam': Adam,
     'rmsprop': RMSprop,
-    'adadelta': Adadelta
+    'adadelta': Adadelta,
+    'sgd': SGD
 }
 
 
-def get_optimiser(opt, lr, decay):
+def get_optimiser(opt, lr, decay, mom):
     if decay.isdigit():
-        return optimiser[opt](lr=lr, decay=decay)
+        if opt == 'sgd':
+            return optimiser[opt](lr=lr, decay=float(decay), momentum=mom, nesterov=True)
+        else:
+            return optimiser[opt](lr=lr, decay=float(decay))
     else:
-        return optimiser[opt](lr=lr)
+        if opt != 'sgd':
+            return optimiser[opt](lr=lr)
+        else:
+            return optimiser[opt](lr=lr, momentum=mom)
+
 
 
 
