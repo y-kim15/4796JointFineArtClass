@@ -7,6 +7,7 @@ import imageio
 import math
 import glob
 import random
+import time
 
 N_CLASSES = 25
 
@@ -112,7 +113,7 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
         f.write("split type: " + str(d_type) + "\n")
         f.close()
         for i in range(n_dest):
-            dir_name = "small" + d_type
+            dir_name = "small_" + d_type
             to_path = os.path.join(target_path + str(i), dir_name)
             create_dir(to_path)
         get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
@@ -249,12 +250,12 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    #path = "../data/wikipaintings_full"
-    #dest_path = "../data/wiki_small"
-    #cur_time = time.strftime("%d%m%y_%H%M")
-    #get_small_from_large_dataset(path, 0.1, dest_path, "../summary_"+cur_time+".txt")
-    class_path = "../data/wikipaintings_class_labels.txt"
-    generate_image_id_file("../data/wikipaintings_full_image.csv", "../data/wikipaintings_full", class_path)
+    path = "../data/wikipaintings_full"
+    dest_path = "../data/wiki_small_2_"
+    cur_time = time.strftime("%d%m%y_%H%M")
+    get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
+    #class_path = "../data/wikipaintings_class_labels.txt"
+    #generate_image_id_file("../data/wikipaintings_full_image.csv", "../data/wikipaintings_full", class_path)
 
 
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
