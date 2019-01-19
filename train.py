@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
-parser.add_argument('--model_type', action='store', default='test1', dest='model_type', help='Type of model [test1|vgg16|inceptionv3|resnet50]')
+parser.add_argument('--model_type', action='store', default='test1', dest='model_type', help='Type of model [test1|auto1|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not [True|False]')
@@ -38,6 +38,7 @@ args = parser.parse_args()
 print("Args: ", args)
 MODEL_DIR = "models/logs"
 
+MODEL_TYPE = args.model_type
 train_type = args.train_type
 BATCH_SIZE = args.batch_size
 N_EPOCHS = args.epochs
@@ -48,6 +49,7 @@ OPT = args.optimiser
 LR = args.lr
 DECAY = args.add_decay
 MOM = args.add_mom
+DATA_TYPE = True
 if OPT != 'sgd':
     print("Warning: chosen optimiser is not SGD, momentum value is ignored.")
 
@@ -58,14 +60,14 @@ VAL_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smallval")
 INPUT_SHAPE = (224, 224, 3)
 
 if train_type != 'empty':
-    MODEL_TYPE = ''
+    # MODEL_TYPE = ''
     if args.model_path is None:
         print("Error: model path should be provided for retraining/tuning.")
     else:
         MODEL_PATH = args.model_path
     name = MODEL_PATH.rsplit('/', 1)[1].replace('hdf5', '')
     model = load_model(MODEL_PATH)
-    name = get_model_name(SAMPLE_N, empty=False, name=name, n_tune=N_TUNE)
+    name = get_model_name(SAMPLE_N, empty=False, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
     dir_path = join(MODEL_PATH.rsplit('/', 1)[0], name)
     create_dir(dir_path)
 else:
@@ -74,6 +76,9 @@ else:
     base_model, output = get_model[MODEL_TYPE](INPUT_SHAPE, pretrained=True)
     if MODEL_TYPE == 'test1':
         model = Model(inputs=base_model.input, outputs=base_model.output)
+    elif MODEL_TYPE == 'auto1':
+        DATA_TYPE = False
+        model = Model(base_model, output)
     else:
         model = Model(inputs=base_model.input, outputs=output(base_model.output))
     name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE, n_tune=N_TUNE)
@@ -93,23 +98,24 @@ if MODEL_TYPE == "vgg":
 else:
     pre_type = False
 train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
-                                horizontal_flip=flip, pre_type=pre_type)
+                                horizontal_flip=flip, pre_type=pre_type, train_type=DATA_TYPE)
 try:
     model = multi_gpu_model(model)
     print("multi gpu enabled")
 except:
     pass
 
-model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM), loss='categorical_crossentropy', metrics=['accuracy'])
+if train_type == 'empty':
+    model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM), loss='categorical_crossentropy', metrics=['accuracy'])
 
 save_summary(dir_path, name, model)
 with open(join(dir_path, name + '.json'), 'w') as json_file:
     json_file.write(model.to_json())
 
 val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
-                              horizontal_flip=flip, pre_type=pre_type)
+                              horizontal_flip=flip, pre_type=pre_type, train_type=DATA_TYPE)
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
-earlyStop = EarlyStopping(monitor='val_acc', patience=5)
+earlyStop = EarlyStopping(monitor='val_acc', patience=10)
 if VAL_PATH != None:
 
     checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',

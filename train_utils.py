@@ -4,7 +4,7 @@ from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform
 from keras.preprocessing.image import ImageDataGenerator
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D
+from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D, UpSampling2D
 from keras.optimizers import Adam, RMSprop, Adadelta, SGD
 from contextlib import redirect_stdout
 import datetime
@@ -18,6 +18,28 @@ MODEL_DIR = "models/logs"
 N_CLASSES = 25
 # Code influenced by keras application examples
 # that from rasta and from ...
+
+def get_autoencoder1(input_shape, pretrained=False):
+    input = Input(shape=input_shape)
+
+    x = Conv2D(16, 3, 3, activation='relu', border_mode='same')(input)
+    x = MaxPooling2D((2, 2), border_mode='same')(x)
+    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
+    x = MaxPooling2D((2, 2), border_mode='same')(x)
+    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
+    encoded = MaxPooling2D((2, 2), border_mode='same')(x)
+
+    # at this point the representation is (8, 4, 4) i.e. 128-dimensional
+
+    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(encoded)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(16, 3, 3, activation='relu', border_mode='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    decoded = Conv2D(3, 3, 3, activation='sigmoid', border_mode='same')(x)
+
+    return input, decoded
 
 
 def get_alexnet(input_shape):
@@ -112,13 +134,13 @@ get_model = {
     "inceptionv3": get_inceptionv3,
     "vgg16": get_vgg16,
     "resnet50": get_resnet50,
-    "test1": get_test1
+    "test1": get_test1,
+    "auto1": get_autoencoder1
 }
 
 
-def get_model_name(sample_no, empty=True, n_tune=0, **kwargs):
+def get_model_name(sample_no, empty=False, model_type='test1', n_tune=0, **kwargs):
     if empty:
-        model_type = kwargs["model_type"]
         now = datetime.datetime.now()
         name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
         name = name + "_empty"
@@ -145,9 +167,9 @@ def vgg_preprocess_input(x):
     # 'RGB'->'BGR'
     x = x[:, :, ::-1]
 
-    x[:,:,0] -=  133.104
-    x[:,:,0] -=  119.973
-    x[:,:,0] -=  104.432
+    x[:, :, 0] -= 133.104
+    x[:, :, 0] -= 119.973
+    x[:, :, 0] -= 104.432
 
     # x = preprocess_input(x)
 
@@ -163,17 +185,25 @@ def wp_preprocess_input(x):
     return x
 
 
-def get_generator(path, batch_size, target_size, horizontal_flip, pre_type):
+def get_generator(path, batch_size, target_size, horizontal_flip, pre_type, train_type):
     if pre_type:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=vgg_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=wp_preprocess_input)
 
-    generator = datagen.flow_from_directory(
-        path,
-        target_size=target_size,
-        batch_size=batch_size,
-        class_mode='categorical')
+    if train_type:
+        generator = datagen.flow_from_directory(
+            path,
+            target_size=target_size,
+            batch_size=batch_size,
+            class_mode='categorical')
+    else:
+        generator = datagen.flow_from_directory(
+            path,
+            target_size=target_size,
+            batch_size=batch_size,
+            class_mode=None)
+
     return generator
 
 
@@ -205,6 +235,9 @@ def get_optimiser(opt, lr, decay, mom):
             return optimiser[opt](lr=lr)
         else:
             return optimiser[opt](lr=lr, momentum=mom)
+
+
+
 
 
 
