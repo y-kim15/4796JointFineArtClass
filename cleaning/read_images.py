@@ -1,21 +1,19 @@
-import shutil, os
+import os
 import re
 import pandas
 import csv
 from cleaning.clean_csv import Clean
 import imageio
 import math
-import glob
 import random
 import time
+from os.path import join, exists
+from random import shuffle
+from shutil import copyfile,move, copy, rmtree
 
 N_CLASSES = 25
 
-def create_dir(file_path):
-    # method to create directory if doesn't exist, overwrite current if exists
-    if os.path.exists(file_path):
-        shutil.rmtree(file_path)
-    os.makedirs(file_path)
+
 
 def count_works(dict):
     # method to count total number of items in dict
@@ -68,8 +66,8 @@ def get_small_dataset(large_path, proportion, target_path, dir_name, summary_pat
         f = open(summary_path, "a")
         f.write("Style: " + style)
         for i in range(n_dest):
-            os.mkdir(os.path.join(target_path + str(i), dir_name, style))
-        dir_path = os.path.join(large_path, style)
+            os.mkdir(join(target_path + str(i), dir_name, style))
+        dir_path = join(large_path, style)
         n = count_files(dir_path)
         f.write(" Size: " + str(n) + "\n")
         total += n
@@ -82,8 +80,8 @@ def get_small_dataset(large_path, proportion, target_path, dir_name, summary_pat
                 index = i * ave + x
                 if index >= len(works):
                     break
-                shutil.copy(os.path.join(dir_path, works[index]),
-                            os.path.join(target_path + str(i), dir_name, style,
+                copy(join(dir_path, works[index]),
+                            join(target_path + str(i), dir_name, style,
                                          os.path.basename(os.path.normpath(works[index]))))
                 count += 1
             dir_count[i] += count
@@ -102,20 +100,20 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
     f.write("*********Summary by Directory*********\nProportion: " + str(proportion) + "\nNo dirs: " + str(n_dest) + "\n")
     f.close()
     for i in range(n_dest):
-        if os.path.exists(target_path + str(i)):
-            shutil.rmtree(target_path + str(i))
+        if exists(target_path + str(i)):
+            rmtree(target_path + str(i))
         os.makedirs(target_path + str(i))
     dirs = os.listdir(large_path)
     for d in dirs:
         f = open(summary_path, "a")
-        large_split_path = os.path.join(large_path, d)
+        large_split_path = join(large_path, d)
         d_type = d.split('_', 1)[1]
         f.write("split type: " + str(d_type) + "\n")
         f.close()
         for i in range(n_dest):
             dir_name = "small_" + d_type
-            to_path = os.path.join(target_path + str(i), dir_name)
-            create_dir(to_path)
+            to_path = join(target_path + str(i), dir_name)
+            Clean.create_dir(to_path)
         get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
 
 
@@ -186,15 +184,15 @@ def generate_image_id_file(name, path, class_file_path, id=True):
 
     upper_dirs = sorted(os.listdir(path))
     for middle in upper_dirs:
-        middle_path = os.path.join(path, middle)
+        middle_path = join(path, middle)
         dirs = sorted(os.listdir(middle_path))
         i = 0
         for dir in dirs:
-            files = sorted(os.listdir(os.path.join(middle_path, dir)))
+            files = sorted(os.listdir(join(middle_path, dir)))
             print("In Directory: ", str(dir))
             for file in files:
                 artist, date, title = get_image_details(file)
-                file_path = os.path.join(middle_path, dir, file)
+                file_path = join(middle_path, dir, file)
                 if not id:
                     new_f.loc[i] = [artist, date, title, str(lines.index(dir)), file_path]
                 else:
@@ -218,25 +216,66 @@ def shuffle_data(train_path, new_path):
 
 # creates file system where images are grouped by artist dir
 def generate_artist_file_system(path, dest_path):
-    if os.path.exists(dest_path):
-        shutil.rmtree(dest_path)
+    if exists(dest_path):
+        rmtree(dest_path)
     os.mkdir(dest_path)
     upper_dirs = os.listdir(path)
     for mid_dir in upper_dirs:
-        dirs = os.listdir(os.path.join(path, mid_dir))
+        dirs = os.listdir(join(path, mid_dir))
 
         for dir in dirs:  # for every class dir
-            files = os.listdir(os.path.join(path, mid_dir, dir))
+            files = os.listdir(join(path, mid_dir, dir))
 
             for index, item in enumerate(files):  # file in files:
                 dest_files = os.listdir(dest_path)  # dest_mid_dir)
-                current_item_path = os.path.join(path, mid_dir, dir, item)
+                current_item_path = join(path, mid_dir, dir, item)
                 new_name = item.split('_')[0]
                 if not new_name in dest_files:
-                    os.mkdir(os.path.join(dest_path, new_name))  # dest_mid_dir, new_name))
-                shutil.copy(current_item_path,
-                            os.path.join(dest_path, new_name, item))  # dest_mid_dir, new_name, item))
+                    os.mkdir(join(dest_path, new_name))  # dest_mid_dir, new_name))
+                copy(current_item_path,
+                            join(dest_path, new_name, item))  # dest_mid_dir, new_name, item))
     print("File system created under data")
+
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+# methods applied existing functions from rasta.python.utils.utils
+def split_test_training(ratio_test=0.1):
+    FULL_PATH = join(DIR_PATH,'../data/id_database_full')
+    TRAIN_PATH = join(DIR_PATH,'../data/i_data_train')
+    TEST_PATH = join(DIR_PATH,'../data/i_data_test')
+    os.mkdir(TRAIN_PATH)
+    os.mkdir(TEST_PATH)
+    list_full = os.listdir(FULL_PATH)
+    n = len(list_full)
+    shuffle(list_full)
+    split_value = int(n * ratio_test)
+    list_test = list_full[:split_value]
+    list_train = list_full[split_value:]
+    print(len(list_train))
+    print(len(list_test))
+    for f in list_train:
+        SRC_PATH = join(FULL_PATH, f)
+        DEST_PATH = join(TRAIN_PATH, f)
+        copyfile(SRC_PATH, DEST_PATH)
+    for f in list_test:
+        SRC_PATH = join(FULL_PATH, f)
+        DEST_PATH = join(TEST_PATH, f)
+        copyfile(SRC_PATH, DEST_PATH)
+
+def split_val_training(ratio_val=0.1):
+    TRAIN_PATH = join(DIR_PATH,'../data/id_data_train')
+    VAL_PATH = join(DIR_PATH,'../data/id_data_val')
+    os.mkdir(VAL_PATH)
+    list_train = os.listdir(TRAIN_PATH)
+    n = len(list_train)
+    shuffle(list_train)
+    split_value = int(n * ratio_val)
+    list_val = list_train[:split_value]
+    print(len(list_val))
+    for f in list_val:
+        SRC_PATH = join(TRAIN_PATH, f)
+        DEST_PATH = join(VAL_PATH, f)
+        move(SRC_PATH, DEST_PATH)
+
 
 
 if __name__ == '__main__':

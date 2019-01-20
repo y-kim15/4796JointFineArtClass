@@ -6,10 +6,16 @@ import sys
 from PIL import Image
 import requests
 import time
+import shutil
 
 # methods to process idb csv file
 special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
 
+def create_dir(file_path):
+    # method to create directory if doesn't exist, overwrite current if exists
+    if os.path.exists(file_path):
+        shutil.rmtree(file_path)
+    os.makedirs(file_path)
 
 class Clean:
     @staticmethod
@@ -285,11 +291,12 @@ class Clean:
 
     @staticmethod
     def download_image_database(input_csv, target_path):
+        create_dir(target_path)
         # method referred from rasta.python.utils.load_data.download_wikipaintings() and _download_image()
         df = pandas.read_csv(input_csv, encoding='utf-8-sig')
-        df.set_index(['id'])
+        #df.set_index(['id'])
         n = 0
-        for index, row in df.iterrows():
+        for _, row in df.iterrows():
             filename = target_path + '/' + row['agent_display'] + "_" + row['title_display']
             Clean._download_image(filename, row['full size'])
             n += 1
@@ -362,5 +369,5 @@ if __name__ == '__main__':
     #data = Clean.assign_id(data, "agent_display")
     #data = Clean.convert_name_order(data, "agent_display")
     #data.to_csv("../data/id_full_large.csv", header=headers, index=False)
-    Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
-
+    #Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
+    Clean.download_image_database("../data/filtered_full_large1.csv", "../data/id_database_full")
