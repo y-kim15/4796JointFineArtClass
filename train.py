@@ -2,12 +2,15 @@ import tensorflow as tf
 import os
 from os.path import join
 import argparse
+import re
+import pickle
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.utils import multi_gpu_model
 from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser
 from rasta.python.models.processing import count_files
-from cleaning.read_images import create_dir
+from cleaning.clean_csv import create_dir
+from keras import backend as K
 
 config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allocator_type = 'BFC'
@@ -22,7 +25,7 @@ parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
-parser.add_argument('--model_type', action='store', default='test1', dest='model_type', help='Type of model [test1|auto1|vgg16|inceptionv3|resnet50]')
+parser.add_argument('--model_type', action='store', default='test1', dest='model_type', help='Type of model [test1|test2|auto1|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not [True|False]')
@@ -54,8 +57,8 @@ if OPT != 'sgd':
     print("Warning: chosen optimiser is not SGD, momentum value is ignored.")
 
 
-TRAIN_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wiki_small" + str(SAMPLE_N), "smallval")
+TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
@@ -74,7 +77,7 @@ else:
     MODEL_TYPE = args.model_type
     MODEL_PATH = None
     base_model, output = get_model[MODEL_TYPE](INPUT_SHAPE, pretrained=True)
-    if MODEL_TYPE == 'test1':
+    if re.search('test*', MODEL_TYPE):
         model = Model(inputs=base_model.input, outputs=base_model.output)
     elif MODEL_TYPE == 'auto1':
         DATA_TYPE = False
@@ -107,6 +110,8 @@ except:
 
 if train_type == 'empty':
     model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM), loss='categorical_crossentropy', metrics=['accuracy'])
+elif LR != 0.001:
+    K.set_value(model.optimizer.lr, LR)
 
 save_summary(dir_path, name, model)
 with open(join(dir_path, name + '.json'), 'w') as json_file:
@@ -135,5 +140,10 @@ else:
                                   epochs=N_EPOCHS)
 
 model.save(join(dir_path, name + ".hdf5"))
+# model.save_weights(join(dir_path,'model_weights.h5'))
+#model.save(join(dir_path,'final_model.hdf5'))
+with open(join(dir_path,'history.pck'), 'wb') as f:
+    pickle.dump(history.history, f)
+    f.close()
 
 

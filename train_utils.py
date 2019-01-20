@@ -3,6 +3,7 @@ from keras.applications.inception_v3 import InceptionV3
 from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform
+from keras.regularizers import l2
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D, UpSampling2D
 from keras.optimizers import Adam, RMSprop, Adadelta, SGD
@@ -65,6 +66,7 @@ def get_alexnet(input_shape):
 
 
 def get_test1(input_shape, pretrained):
+    # architecture follows general CNN design
 
     base_model = Sequential()
     base_model.add(InputLayer(input_shape))
@@ -82,6 +84,31 @@ def get_test1(input_shape, pretrained):
     base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(1)))
 
     return base_model, base_model.output
+
+
+def get_test2(input_shape, pretrained):
+    # fixed seed, use of l2 regularisation, dropout rate of 0.2, initial Conv layer with kernel size 5x5 followed by
+    # 2 layers of 3x3 each
+    base_model = Sequential()
+    base_model.add(InputLayer(input_shape))
+    base_model.add(Conv2D(64, (5, 5), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=l2(0.01)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=l2(0.01)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=l2(0.01)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+
+    # out = Sequential()
+    base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
+    base_model.add(Dropout(0.2))
+    base_model.add(Dense(28, activation='relu', kernel_initializer=glorot_uniform(0)))
+    base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(0)))
+
+    return base_model, base_model.output
+
 
 
 def get_vgg16(input_shape, pretrained=True):
@@ -135,11 +162,12 @@ get_model = {
     "vgg16": get_vgg16,
     "resnet50": get_resnet50,
     "test1": get_test1,
+    'test2': get_test2,
     "auto1": get_autoencoder1
 }
 
 
-def get_model_name(sample_no, empty=False, model_type='test1', n_tune=0, **kwargs):
+def get_model_name(sample_no, empty=True, model_type='test1', n_tune=0, **kwargs):
     if empty:
         now = datetime.datetime.now()
         name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
