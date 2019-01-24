@@ -9,7 +9,7 @@ from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, Learnin
 from keras.utils import multi_gpu_model
 from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser
 from rasta.python.models.processing import count_files
-from cleaning.clean_csv import create_dir
+from processing.clean_csv import create_dir
 from keras import backend as K
 
 config = tf.ConfigProto(allow_soft_placement=True)
@@ -82,8 +82,10 @@ else:
     elif MODEL_TYPE == 'auto1':
         DATA_TYPE = False
         model = Model(base_model, output)
-    else:
+    elif MODEL_TYPE == 'vgg16':
         model = Model(inputs=base_model.input, outputs=output(base_model.output))
+    else:
+        model = Model(inputs=base_model.input, outputs=output)
     name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE, n_tune=N_TUNE)
     dir_path = join("models", name)
     create_dir(dir_path)

@@ -123,7 +123,7 @@ def get_vgg16(input_shape, pretrained=True):
     #x.add(Dense(256, activation='relu'))
     # x.add(Dropout(0.5))
     #x.add(Dense(512, activation='relu'))
-    # x.add(Dropout(0.5))
+    #x.add(Dropout(0.5))
     x.add(Dense(N_CLASSES, activation='softmax'))
     return base_model, x
 
@@ -172,7 +172,6 @@ def get_model_name(sample_no, empty=True, model_type='test1', n_tune=0, **kwargs
         now = datetime.datetime.now()
         name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
         name = name + "_empty"
-
     else:
         name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
     if n_tune == 0:
@@ -224,12 +223,14 @@ def get_generator(path, batch_size, target_size, horizontal_flip, pre_type, trai
             path,
             target_size=target_size,
             batch_size=batch_size,
+            seed=0,
             class_mode='categorical')
     else:
         generator = datagen.flow_from_directory(
             path,
             target_size=target_size,
             batch_size=batch_size,
+            seed=0,
             class_mode=None)
 
     return generator

@@ -2,7 +2,7 @@ import os
 import re
 import pandas
 import csv
-from cleaning.clean_csv import Clean
+from processing.clean_csv import Clean
 import imageio
 import math
 import random

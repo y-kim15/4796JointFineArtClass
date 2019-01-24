@@ -11,11 +11,16 @@ import shutil
 # methods to process idb csv file
 special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
 
-def create_dir(file_path):
+
+def create_dir(file_path, remove=True):
     # method to create directory if doesn't exist, overwrite current if exists
     if os.path.exists(file_path):
-        shutil.rmtree(file_path)
-    os.makedirs(file_path)
+        if remove:
+            shutil.rmtree(file_path)
+            os.makedirs(file_path)
+    else:
+        os.makedirs(file_path)
+
 
 class Clean:
     @staticmethod
@@ -197,6 +202,7 @@ class Clean:
         # sample_name: name of file, other_name: name on csv
         sample = sample_name.split("-")
         other = other_name.split("-")
+        # since other has surname-first order
         if type:
             # compare surnames
             if sample[-1] == other[0]:
@@ -205,6 +211,8 @@ class Clean:
                         return True
                 else:
                     return True
+            elif other_name in sample_name or sample_name in other_name:
+                return True
         elif type is None:
             # date
             if sample_name in other_name:
@@ -291,15 +299,18 @@ class Clean:
 
     @staticmethod
     def download_image_database(input_csv, target_path):
-        create_dir(target_path)
+        create_dir(target_path, remove=False)
         # method referred from rasta.python.utils.load_data.download_wikipaintings() and _download_image()
         df = pandas.read_csv(input_csv, encoding='utf-8-sig')
         #df.set_index(['id'])
         n = 0
         for _, row in df.iterrows():
             filename = target_path + '/' + row['agent_display'] + "_" + row['title_display']
-            Clean._download_image(filename, row['full size'])
-            n += 1
+            if not os.path.exists(filename):
+                Clean._download_image(filename, row['full size'])
+                n += 1
+            else:
+                continue
             if n % 5 == 0:
                 sys.stdout.flush()
                 time.sleep(1)
@@ -363,11 +374,12 @@ if __name__ == '__main__':
     #print(headers)"""
     #Clean.find_artist_list(200, "../data/result_large.csv")  # 50 - 134 artists, #100 - 54 artists #150 - 28 artists #200  - 18 artist
     #Clean.remove_match_images("../data/wikipaintings_full", "../data/result_large.csv",
-     #                         "../data/filtered_full_large.csv", "../data/dropped_full_large.csv" )
+    #                         "../data/filtered_imp_full_large.csv", "../data/dropped_imp_full_large.csv" )
     #data = pandas.read_csv("../data/filtered_full_large1.csv", header=0)
     #headers = list(data[:0])
     #data = Clean.assign_id(data, "agent_display")
     #data = Clean.convert_name_order(data, "agent_display")
     #data.to_csv("../data/id_full_large.csv", header=headers, index=False)
     #Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
-    Clean.download_image_database("../data/filtered_full_large1.csv", "../data/id_database_full")
+    Clean.download_image_database("../data/filtered_full_large2.csv", "../data/id_database_full")
+    # filtered_full_large2 here since first created files rows are removed, added option to ignore if the file already exists
