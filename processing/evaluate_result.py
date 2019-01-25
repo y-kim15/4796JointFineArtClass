@@ -1,0 +1,241 @@
+import numpy as np
+from keras.models import load_model, Model
+from keras.preprocessing.image import load_img, img_to_array
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_curve, auc
+import matplotlib.pyplot as plt
+import seaborn as sns
+from keras import metrics
+from progressbar import ProgressBar
+from train_utils import vgg_preprocess_input, wp_preprocess_input
+from processing.read_images import count_files
+from rasta.python.utils.utils import get_dico, invert_dico
+from os import listdir
+from os.path import join
+import numpy as np
+from bokeh.plotting import figure, show, output_file
+
+
+# https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
+
+
+def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(8, 8)):
+    # target size is the size of the image to load in
+    # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
+    model = load_model(model_path)
+    outputs = [layer.output for layer in model.layers]
+    act_model = Model(inputs=model.input, outputs=outputs)
+    img = load_img(img_path, target_size=target_size)
+    x = img_to_array(img)
+    if 'vgg16' in model_path:
+        x = vgg_preprocess_input(x)
+    else:
+        x = wp_preprocess_input(x)
+    activations = act_model.predict(x[np.newaxis:...])
+    act = activations[layer_no]
+    i = 0
+    fig, ax = plt.subplot(plot_size[0], plot_size[1], figsize=(plot_size[0]*2.5, plot_size[1]*1.5))
+    for r in range(0, plot_size[0]):
+        for c in range(0, plot_size[1]):
+            ax[r][c].imshow(act[0, :, :, i])
+            i += 1
+
+
+def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
+    model = load_model(model_path)
+    model.metrics.append(metrics.top_k_categorical_accuracy)
+    dico = get_dico()
+    y_true = []
+    y_pred = []
+    s = count_files(test_path)
+    styles = listdir(test_path)
+    print('Calculating predictions...')
+    bar = ProgressBar(max_value=s)
+    i = 0
+    for style in styles:
+        path = join(test_path, style)
+        label = dico.get(style)
+        imgs = listdir(path)
+        for name in imgs:
+            img = load_img(join(path, name), target_size=target_size)
+            x = img_to_array(img)
+            x = wp_preprocess_input(x)
+            pred = model.predict(x[np.newaxis, ...])
+            args_sorted = np.argsort(pred)[0][::-1]
+            y_true.append(label)
+            y_pred.append([a for a in args_sorted[:top_k]])
+            i += 1
+            bar.update(i)
+    return np.asarray(y_pred), y_true
+
+
+def get_confusion_matrix(y_true, y_pred, show=False): # output of get_y_prediction
+    cm = confusion_matrix(y_true, y_pred)
+    if show:
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt="d", cmap=sns.color_palette("#444444"))
+    '''
+    dico = get_dico()
+
+    new_conf_arr = []
+    for row in conf_arr:
+        new_conf_arr.append(row / sum(row))
+
+    plt.matshow(new_conf_arr)
+    plt.yticks(range(25), dico.keys())
+    plt.xticks(range(25), dico.keys(), rotation=90)
+    plt.colorbar()
+    plt.show()
+    
+    '''
+    return cm
+
+
+def get_rates(y_true, y_pred, cm):
+    rates = dict()
+    row_sum = cm.sum(axis=1)
+    len = cm.shape[0]
+    total_sum = cm.sum()
+    ver_sum = cm.sum(axis=0)
+
+    for i in range(len):
+        output = []
+        tpr = cm[i][i]/row_sum[i]
+        fn = row_sum[i]-cm[i][i]
+        fp = ver_sum[i]-cm[i][i]
+        tnr = (total_sum-cm[i][i]-fn-fp)/(total_sum-row_sum[i])
+        # get classification accuracy and mis-classification
+        accuracy = accuracy_score(y_true, y_pred)
+        output.append(('accuracy', round(accuracy, 3)))
+        output.append(('error', round(1-accuracy, 3)))
+        output.append(('sensitivity', round(tpr, 3)))
+        output.append(('specificity', round(tnr, 3)))
+        rates[i] = output
+    return rates
+
+
+def get_pred(model_path, image_path, top_k=1):
+    model = load_model(model_path)
+    target_size = (224, 224)
+    img = load_img(image_path, target_size=target_size)
+    x = img_to_array(img)
+    x = wp_preprocess_input(x)
+    pred = model.predict(x[np.newaxis, ...])
+    dico = get_dico()
+    inv_dico = invert_dico(dico)
+    args_sorted = np.argsort(pred)[0][::-1]
+    preds = [inv_dico.get(a) for a in args_sorted[:top_k]]
+    pcts = [pred[0][a] for a in args_sorted[:top_k]]
+    return preds, pcts
+
+
+def get_precision_recall(y_true, y_pred, name):
+    values = []
+    for (t, p) in zip(y_true, y_pred):
+        precision, recall, _ = precision_recall_curve(t.ravel(), p.ravel())
+        values.append((precision, recall))
+    all_true = np.concatenate(y_true)
+    all_pred = np.concatenate(y_pred)
+    all_precision, all_recall, _ = precision_recall_curve(all_true.ravel(), all_pred.ravel())
+    area = round(auc(all_recall, all_precision), 2)
+    '''old: show pr curve 
+    showPRCurve(values, allPrecision, allRecall, type, name, path, show):
+    plt.figure(figsize=[6, 4.5])
+    for i, (precision, recall) in enumerate(values):
+        label = 'Fold %d AUC %.4f' % (i + 1, auc(recall, precision))
+        plt.step(recall, precision, label=label)
+    label = 'Overall AUC %.4f' % (auc(allRecall, allPrecision))
+    plt.step(allRecall, allPrecision, label=label, lw=2, color='black')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('{0} - PR Curve'.format(name))
+    plt.legend(loc='lower left', fontsize='small')
+    plt.savefig(path + '/' + type + '_prc_' + name + '.svg', format = "svg")
+    if show:
+        plt.show()
+    '''
+    x = np.linspace(0.1, 5, 80)
+
+    p = figure(title="log axis example", y_axis_type="log",
+               x_range=(0, 5), y_range=(0.001, 10 ** 22),
+               background_fill_color="#fafafa")
+
+    p.line(x, np.sqrt(x), legend="y=sqrt(x)",
+           line_color="tomato", line_dash="dashed")
+
+    p.line(x, x, legend="y=x")
+    p.circle(x, x, legend="y=x")
+
+    p.line(x, x ** 2, legend="y=x**2")
+    p.circle(x, x ** 2, legend="y=x**2",
+             fill_color=None, line_color="olivedrab")
+
+    p.line(x, 10 ** x, legend="y=10^x",
+           line_color="gold", line_width=2)
+
+    p.line(x, x ** x, legend="y=x^x",
+           line_dash="dotted", line_color="indigo", line_width=2)
+
+    p.line(x, 10 ** (x ** 2), legend="y=10^(x^2)",
+           line_color="coral", line_dash="dotdash", line_width=2)
+
+    p.legend.location = "top_left"
+
+    output_file("logplot.html", title="log plot example")
+
+    show(p)
+    return area
+
+# using bokeh to display interactive confusion matrix (possible to hover and save)
+def display_cm_hover(model_path, y_true, y_pred):
+    name = model_path.split('/')[-2] + '-' + model_path.rsplit('/', 1)[1].replace('hdf5', '')
+    cm = get_confusion_matrix(y_true, y_pred)
+    names = list(get_dico().keys())
+    N = len(names)
+    counts = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            counts[i, j] = cm[i][j]
+    colormap = ["#444444", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
+                "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a"]
+
+    xname = []
+    yname = []
+    color = []
+    for i, name1 in enumerate(names):
+        for j, name2 in enumerate(names):
+            xname.append(name1)
+            yname.append(name2)
+
+            if name1 == name2:
+                color.append(colormap[0])
+            #else:
+             #   color.append('lightgrey')
+
+    data = dict(
+        xname=xname,
+        yname=yname,
+        colors=color,
+        count=counts.flatten(),
+    )
+
+    p = figure(title="Confusion Matrix",
+               x_axis_location="above", tools="hover,save",
+               x_range=list(reversed(names)), y_range=names,
+               tooltips=[('true', '@yname'),( 'pred', '@xname'), ('count', '@count')])
+
+    p.plot_width = 800
+    p.plot_height = 800
+    p.grid.grid_line_color = None
+    p.axis.axis_line_color = None
+    p.axis.major_tick_line_color = None
+    p.axis.major_label_text_font_size = "5pt"
+    p.axis.major_label_standoff = 0
+    p.xaxis.major_label_orientation = np.pi / 3
+
+    p.rect('xname', 'yname', 0.9, 0.9, source=data,
+           color='colors', alpha='alphas', line_color=None,
+           hover_line_color='black', hover_color='colors')
+    file_name = 'conf_' + name
+    output_file(file_name + '.html', title=file_name)
+
+    show(p)  # show the plot
