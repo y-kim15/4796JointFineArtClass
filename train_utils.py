@@ -5,6 +5,7 @@ from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform
 from keras.regularizers import l2
 from keras.preprocessing.image import ImageDataGenerator
+from keras.constraints import MaxNorm
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D, UpSampling2D
 from keras.optimizers import Adam, RMSprop, Adadelta, SGD
 from contextlib import redirect_stdout
@@ -65,7 +66,7 @@ def get_alexnet(input_shape):
         print(alexnet.summary())
 
 
-def get_test1(input_shape, pretrained):
+def get_test1(input_shape, add_reg, alpha, dropout=0.5, pretrained=False):
     # architecture follows general CNN design
 
     base_model = Sequential()
@@ -79,39 +80,66 @@ def get_test1(input_shape, pretrained):
 
     #out = Sequential()
     base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
-    base_model.add(Dropout(0.5))
+    if dropout > 0:
+        base_model.add(Dropout(dropout))
     base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(1)))
     base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(1)))
 
     return base_model, base_model.output
 
 
-def get_test2(input_shape, pretrained):
+def get_test2(input_shape, add_reg=l2, alpha=0.01, dropout=0.2, pretrained=False):
     # fixed seed, use of l2 regularisation, dropout rate of 0.2, initial Conv layer with kernel size 5x5 followed by
     # 2 layers of 3x3 each
     base_model = Sequential()
     base_model.add(InputLayer(input_shape))
     base_model.add(Conv2D(64, (5, 5), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0),
-                          kernel_regularizer=l2(0.01)))
+                          kernel_regularizer=add_reg(alpha)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
     base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
-                          kernel_regularizer=l2(0.01)))
+                          kernel_regularizer=add_reg(alpha)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
     base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
-                          kernel_regularizer=l2(0.01)))
+                          kernel_regularizer=add_reg(alpha)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
 
     # out = Sequential()
     base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
-    base_model.add(Dropout(0.2))
+    if dropout > 0:
+        base_model.add(Dropout(dropout))
     base_model.add(Dense(28, activation='relu', kernel_initializer=glorot_uniform(0)))
     base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(0)))
 
     return base_model, base_model.output
 
+def get_test3(input_shape, add_reg=l2, alpha=0.01, dropout=0.2, pretrained=False):
+    # fixed seed, use of l2 regularisation, dropout rate of 0.2, initial Conv layer with kernel size 5x5 followed by
+    # 2 layers of 3x3 each
+    base_model = Sequential()
+    base_model.add(InputLayer(input_shape))
+    base_model.add(Conv2D(64, (5, 5), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=add_reg(alpha)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=add_reg(alpha)))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
+                          kernel_regularizer=add_reg(alpha)))
+    # base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+
+    # out = Sequential()
+    base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
+    base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(0), kernel_constraint=MaxNorm(max_value=4)))
+    if dropout > 0:
+        base_model.add(Dropout(dropout))
+    base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(0)))
+
+    return base_model, base_model.output
 
 
-def get_vgg16(input_shape, pretrained=True):
+def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
     if not pretrained:
         base_model = VGG16(include_top=False, weights=None, input_shape=input_shape)
         # return base_model
@@ -121,14 +149,15 @@ def get_vgg16(input_shape, pretrained=True):
     x = Sequential()
     x.add(Flatten(input_shape=base_model.output_shape[1:]))
     #x.add(Dense(256, activation='relu'))
-    # x.add(Dropout(0.5))
+    if dropout > 0:
+        x.add(Dropout(dropout))
     #x.add(Dense(512, activation='relu'))
     #x.add(Dropout(0.5))
     x.add(Dense(N_CLASSES, activation='softmax'))
     return base_model, x
 
 
-def get_inceptionv3(input_shape, pretrained=True):
+def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
     if not pretrained:
         base_model = InceptionV3(include_top=True, weights=None, input_shape=input_shape)
 
@@ -145,7 +174,7 @@ def get_inceptionv3(input_shape, pretrained=True):
     return base_model, output
 
 
-def get_resnet50(input_shape, pretrained=True):
+def get_resnet50(input_shape, add_reg, alpha, dropout=0.5, pretrained=True):
     if not pretrained:
         base_model = ResNet50(input_shape=input_shape, weights=None, include_top=True)
     else:
@@ -153,6 +182,11 @@ def get_resnet50(input_shape, pretrained=True):
 
     x = base_model.output
     x = GlobalAveragePooling2D(data_format='channels_last')(x)
+    # added below
+    x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    if dropout > 0:
+        x = Dropout(dropout)(x)
+    # up to above
     output = Dense(N_CLASSES, activation='softmax')(x)
     return base_model, output
 
@@ -163,6 +197,7 @@ get_model = {
     "resnet50": get_resnet50,
     "test1": get_test1,
     'test2': get_test2,
+    'test3': get_test3,
     "auto1": get_autoencoder1
 }
 

@@ -307,7 +307,7 @@ class Clean:
         for _, row in df.iterrows():
             filename = target_path + '/' + row['agent_display'] + "_" + row['title_display']
             if not os.path.exists(filename):
-                Clean._download_image(filename, row['full size'])
+                Clean._download_image(filename, row['screen presentation'])
                 n += 1
             else:
                 continue
@@ -381,5 +381,5 @@ if __name__ == '__main__':
     #data = Clean.convert_name_order(data, "agent_display")
     #data.to_csv("../data/id_full_large.csv", header=headers, index=False)
     #Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
-    Clean.download_image_database("../data/filtered_full_large2.csv", "../data/id_database_full")
+    Clean.download_image_database("../data/filtered_full_large11.csv", "../data/id_database_medium")
     # filtered_full_large2 here since first created files rows are removed, added option to ignore if the file already exists
