@@ -8,7 +8,7 @@ from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
-from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser
+from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay
 from rasta.python.models.processing import count_files
 from processing.clean_csv import create_dir
 from keras import backend as K
@@ -35,10 +35,10 @@ parser.add_argument('-n', action="store", default=0, type=int,dest='n_layers_tra
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 10), metavar='[0-9]', help='Sample Number to use [0-9]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
-parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|rate_v|step]')
+parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|v|rate|step|exp]')
 parser.add_argument('-r', action="store", default='l2', dest='add_reg', help='Add regularisation in Conv layers [none|l1|l2]')
 parser.add_argument('--alp', action="store", default=0.01, type=float, dest='alpha', help='Value of Alpha for regularizer')
-parser.add_argument('--dropout', action="store", default=0.5, type=float, dest='add_drop', help='Add dropout rate [0-1]')
+parser.add_argument('--dropout', action="store", default=0.2, type=float, dest='add_drop', help='Add dropout rate [0-1]')
 parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
 
 args = parser.parse_args()
@@ -66,8 +66,10 @@ elif args.add_reg == 'l1':
 else:
     REG = l2
 
-TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
+changed = False
+TRAIN_PATH = join(PATH, "data/wikipaintings_full/wikipaintings_train")
+# join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wikipaintings_full/wikipaintings_val")  # + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
@@ -81,7 +83,7 @@ if train_type != 'empty':
     model = load_model(MODEL_PATH)
     name = get_model_name(SAMPLE_N, empty=False, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
     if args.new_path == 'Y':
-        dir_path = join(MODEL_PATH.split('/')[1], train_type + 'tune-' + str(N_TUNE) + '-no-' + str(SAMPLE_N), name)
+        dir_path = join(MODEL_PATH.split('/')[0], MODEL_PATH.split('/')[1], train_type +'-tune-'+str(N_TUNE), name)
     else:
         dir_path = join(MODEL_PATH.rsplit('/', 1)[0], name)
     create_dir(dir_path)
@@ -101,13 +103,18 @@ else:
     name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE, n_tune=N_TUNE)
     dir_path = join("models", name)
     create_dir(dir_path)
-changed = False
+
 if N_TUNE > 0:
     for layer in model.layers[:len(model.layers) - N_TUNE]:
         if layer.trainable == True:
             changed = True
         layer.trainable = False
     for layer in model.layers[len(model.layers) - N_TUNE:]:
+        if layer.trainable == False:
+            changed = True
+        layer.trainable = True
+else:
+    for layer in model.layers:
         if layer.trainable == False:
             changed = True
         layer.trainable = True
@@ -119,7 +126,7 @@ if MODEL_TYPE == "vgg":
 else:
     pre_type = False
 train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
-                                horizontal_flip=flip, pre_type=pre_type, train_type=DATA_TYPE)
+                                horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 try:
     model = multi_gpu_model(model)
     print("multi gpu enabled")
@@ -127,7 +134,7 @@ except:
     pass
 
 if train_type == 'empty' or changed:
-    model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
 elif LR != 0.001:
     K.set_value(model.optimizer.lr, LR)
 
@@ -136,15 +143,18 @@ with open(join(dir_path, name + '.json'), 'w') as json_file:
     json_file.write(model.to_json())
 
 val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
-                              horizontal_flip=flip, pre_type=pre_type, train_type=DATA_TYPE)
+                              horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
 earlyStop = EarlyStopping(monitor='val_acc', patience=5)
 if VAL_PATH != None:
 
     checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                  verbose=1, save_best_only=True, mode='max')
-    if DECAY == 'step':
-        lr_decay = LearningRateScheduler(step_decay)
+    if not DECAY.isdigit() or DECAY != None:
+        if DECAY == 'step':
+            lr_decay = LearningRateScheduler(step_decay)
+        else:
+            lr_decay = LearningRateScheduler(exp_decay)
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop, lr_decay],
                                       validation_data=val_generator,
@@ -158,8 +168,6 @@ else:
                                   epochs=N_EPOCHS)
 
 model.save(join(dir_path, name + ".hdf5"))
-# model.save_weights(join(dir_path,'model_weights.h5'))
-#model.save(join(dir_path,'final_model.hdf5'))
 with open(join(dir_path,'history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()
