@@ -1,12 +1,14 @@
 import numpy as np
 from keras.models import load_model, Model
 from keras.preprocessing.image import load_img, img_to_array
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_curve, auc
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_curve, auc, classification_report
 import matplotlib.pyplot as plt
+from matplotlib import colors
+from matplotlib.colors import ListedColormap
 import seaborn as sns
 from keras import metrics
 from progressbar import ProgressBar
-from train_utils import vgg_preprocess_input, wp_preprocess_input
+from train_utils import imagenet_preprocess_input, wp_preprocess_input
 from processing.read_images import count_files
 from rasta.python.utils.utils import get_dico, invert_dico
 from os import listdir
@@ -26,8 +28,8 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(8, 8)):
     act_model = Model(inputs=model.input, outputs=outputs)
     img = load_img(img_path, target_size=target_size)
     x = img_to_array(img)
-    if 'vgg16' in model_path:
-        x = vgg_preprocess_input(x)
+    if 'vgg16' or 'resnet50' in model_path:
+        x = imagenet_preprocess_input(x)
     else:
         x = wp_preprocess_input(x)
     activations = act_model.predict(x[np.newaxis:...])
@@ -128,7 +130,7 @@ def get_pred(model_path, image_path, top_k=1):
     return preds, pcts
 
 
-def get_precision_recall(y_true, y_pred, name):
+def get_precision_recall(y_true, y_pred, name, display_all=False):
     values = []
     for (t, p) in zip(y_true, y_pred):
         precision, recall, _ = precision_recall_curve(t.ravel(), p.ravel())
@@ -137,6 +139,22 @@ def get_precision_recall(y_true, y_pred, name):
     all_pred = np.concatenate(y_pred)
     all_precision, all_recall, _ = precision_recall_curve(all_true.ravel(), all_pred.ravel())
     area = round(auc(all_recall, all_precision), 2)
+    if not display_all:
+        x = np.linspace(0.1, 5, 80)
+
+        p = figure(title='Precision & Recall for ' + name, y_axis_type=float,
+                   x_range=(0.0, max(all_recall)+1.0), y_range=(0.0, max(all_precision)+1.0),
+                   background_fill_color="#fafafa")
+
+        p.line(all_recall, all_precision, legend='Overall AUC %.4f' % (round(auc(all_recall, all_precision, 2))),
+               line_color="tomato", line_dash="dashed")
+        p.legend.location = "top_left"
+        file_name = 'pr_curve_'+name
+        output_file(file_name+".html", title=file_name)
+        show(p)
+
+    return area
+
     '''old: show pr curve 
     showPRCurve(values, allPrecision, allRecall, type, name, path, show):
     plt.figure(figsize=[6, 4.5])
@@ -153,39 +171,10 @@ def get_precision_recall(y_true, y_pred, name):
     if show:
         plt.show()
     '''
-    x = np.linspace(0.1, 5, 80)
-
-    p = figure(title="log axis example", y_axis_type="log",
-               x_range=(0, 5), y_range=(0.001, 10 ** 22),
-               background_fill_color="#fafafa")
-
-    p.line(x, np.sqrt(x), legend="y=sqrt(x)",
-           line_color="tomato", line_dash="dashed")
-
-    p.line(x, x, legend="y=x")
-    p.circle(x, x, legend="y=x")
-
-    p.line(x, x ** 2, legend="y=x**2")
-    p.circle(x, x ** 2, legend="y=x**2",
-             fill_color=None, line_color="olivedrab")
-
-    p.line(x, 10 ** x, legend="y=10^x",
-           line_color="gold", line_width=2)
-
-    p.line(x, x ** x, legend="y=x^x",
-           line_dash="dotted", line_color="indigo", line_width=2)
-
-    p.line(x, 10 ** (x ** 2), legend="y=10^(x^2)",
-           line_color="coral", line_dash="dotdash", line_width=2)
-
-    p.legend.location = "top_left"
-
-    output_file("logplot.html", title="log plot example")
-
-    show(p)
-    return area
 
 # using bokeh to display interactive confusion matrix (possible to hover and save)
+
+
 def display_cm_hover(model_path, y_true, y_pred):
     name = model_path.split('/')[-2] + '-' + model_path.rsplit('/', 1)[1].replace('hdf5', '')
     cm = get_confusion_matrix(y_true, y_pred)
@@ -239,3 +228,39 @@ def display_cm_hover(model_path, y_true, y_pred):
     output_file(file_name + '.html', title=file_name)
 
     show(p)  # show the plot
+
+def get_classification_report(y_true, y_pred, name, title):
+    ddl_heat = ['#DBDBDB', '#DCD5CC', '#DCCEBE', '#DDC8AF', '#DEC2A0', '#DEBB91',
+                '#DFB583', '#DFAE74', '#E0A865', '#E1A256', '#E19B48', '#E29539']
+    ddlheatmap = colors.ListedColormap(ddl_heat)
+    title = title or 'Classification report'
+    cr = classification_report(y_true, y_pred, name)
+    lines = cr.split('\n')
+    classes = []
+    matrix = []
+
+    for line in lines[2:(len(lines) - 3)]:
+        s = line.split()
+        classes.append(s[0])
+        value = [float(x) for x in s[1: len(s) - 1]]
+        matrix.append(value)
+
+    fig, ax = plt.subplots(1)
+
+    for column in range(len(matrix) + 1):
+        for row in range(len(classes)):
+            txt = matrix[row][column]
+            ax.text(column, row, matrix[row][column], va='center', ha='center')
+
+    fig = plt.imshow(matrix, interpolation='nearest', cmap=ddlheatmap)
+    plt.title(title)
+    plt.colorbar()
+    x_tick_marks = np.arange(len(classes) + 1)
+    y_tick_marks = np.arange(len(classes))
+    plt.xticks(x_tick_marks, ['precision', 'recall', 'f1-score'], rotation=45)
+    plt.yticks(y_tick_marks, classes)
+    plt.ylabel('Classes')
+    plt.xlabel('Measures')
+    plt.show()
+    # from https://medium.com/district-data-labs/visual-diagnostics-for-more-informed-machine-learning-7ec92960c96b
+
