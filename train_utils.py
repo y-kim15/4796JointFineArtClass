@@ -13,7 +13,8 @@ import datetime
 import os
 from os.path import join
 import math
-
+from keras.preprocessing.image import load_img, img_to_array
+import numpy as np
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
@@ -174,7 +175,7 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
     return base_model, output
 
 
-def get_resnet50(input_shape, add_reg, alpha, dropout=0.5, pretrained=True):
+def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
     if not pretrained:
         base_model = ResNet50(input_shape=input_shape, weights=None, include_top=True)
     else:
@@ -225,33 +226,14 @@ def save_summary(dir_path, name, model):
             model.summary()
 
 
-def vgg_preprocess_input(x):
-    # 'RGB'->'BGR'
-    x = x[:, :, ::-1]
-
-    x[:, :, 0] -= 133.104
-    x[:, :, 0] -= 119.973
-    x[:, :, 0] -= 104.432
-
-    # x = preprocess_input(x)
-
-    return x
 
 
-def wp_preprocess_input(x):
 
-    x[:, :, 0] -= 133.104
-    x[:, :, 0] -= 119.973
-    x[:, :, 0] -= 104.432
-
-    return x
-
-
-def get_generator(path, batch_size, target_size, horizontal_flip, pre_type, train_type):
-    if pre_type:
-        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=vgg_preprocess_input)
+def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
+    if function == 'vgg16' or function == 'resnet50':
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
     else:
-        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=wp_preprocess_input)
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
 
     if train_type:
         generator = datagen.flow_from_directory(
@@ -280,6 +262,14 @@ def step_decay(epoch):
     return lrate
 
 
+# learning rate schedule
+def exp_decay(epoch):
+   initial_lrate = 0.1
+   k = 0.1
+   lrate = initial_lrate * math.exp(-k * epoch)
+   return lrate
+
+
 optimiser = {
     'adam': Adam,
     'rmsprop': RMSprop,
@@ -288,7 +278,7 @@ optimiser = {
 }
 
 
-def get_optimiser(opt, lr, decay, mom):
+def get_optimiser(opt, lr, decay, mom, n_epoch):
     if decay.isdigit():
         if opt == 'sgd':
             return optimiser[opt](lr=lr, decay=float(decay), momentum=mom, nesterov=True)
@@ -296,13 +286,59 @@ def get_optimiser(opt, lr, decay, mom):
             return optimiser[opt](lr=lr, decay=float(decay))
     else:
         if opt != 'sgd':
-            return optimiser[opt](lr=lr)
+            if decay == 'rate':
+                return optimiser[opt](lr=lr, decay=lr/n_epoch)
+            else:
+                return optimiser[opt](lr=lr)
         else:
-            return optimiser[opt](lr=lr, momentum=mom)
+            if decay == 'rate':
+                return optimiser[opt](lr=lr, momentum=mom, decay=lr/n_epoch)
+            else:
+                return optimiser[opt](lr=lr, momentum=mom)
+
+
+def imagenet_preprocess_input(x):
+    # 'RGB'->'BGR'
+    x = x[:, :, ::-1]
+    # Zero-center by mean pixel
+    x[:, :, 0] -= 103.939
+    x[:, :, 1] -= 116.779
+    x[:, :, 2] -= 123.68
+    return x
+
+
+def scale_preprocess_input(x):
+    x[:, :, 0] -= 133.104
+    x[:, :, 0] -= 119.973
+    x[:, :, 0] -= 104.432
+    x *= 1./255
+    return x
+
+
+def wp_preprocess_input(x):
+    # 'RGB'->'BGR'
+    x = x[:, :, ::-1]
+
+    x[:, :, 0] -= 133.104
+    x[:, :, 0] -= 119.973
+    x[:, :, 0] -= 104.432
+    return x
 
 
 
-
+if __name__=='__main__':
+    DATA_PATH = 'data/wikipaintings_full/wikipaintings_train/Abstract_Art/ad-reinhardt_collage-1938.jpg'
+    x = load_img(DATA_PATH, target_size=(224, 224))
+    print("current")
+    x = img_to_array(x)
+    print(x)
+    temp = x
+    #print("using imagenet ")
+    #x = imagenet_preprocess_input(x)
+    #print(x)
+    print("using wp")
+    temp = wp_preprocess_input(temp)
+    print(temp)
 
 
 
