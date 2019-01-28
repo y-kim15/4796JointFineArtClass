@@ -236,12 +236,13 @@ def generate_artist_file_system(path, dest_path):
                             join(dest_path, new_name, item))  # dest_mid_dir, new_name, item))
     print("File system created under data")
 
-DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+DIR_PATH = 'C:/Users/Kira Kim/Documents/cs4796'#os.path.dirname(os.path.realpath(__file__))
 # methods applied existing functions from rasta.python.utils.utils
-def split_test_training(ratio_test=0.1):
-    FULL_PATH = join(DIR_PATH,'../data/id_database_full')
-    TRAIN_PATH = join(DIR_PATH,'../data/i_data_train')
-    TEST_PATH = join(DIR_PATH,'../data/i_data_test')
+
+def split_test_training(ratio_test=0.1, name='medium'):
+    FULL_PATH = join(DIR_PATH,'data/id_database_' + name)
+    TRAIN_PATH = join(DIR_PATH, 'data',  name + '_train')
+    TEST_PATH = join(DIR_PATH, 'data',  name + '_test')
     os.mkdir(TRAIN_PATH)
     os.mkdir(TEST_PATH)
     list_full = os.listdir(FULL_PATH)
@@ -261,9 +262,9 @@ def split_test_training(ratio_test=0.1):
         DEST_PATH = join(TEST_PATH, f)
         copyfile(SRC_PATH, DEST_PATH)
 
-def split_val_training(ratio_val=0.1):
-    TRAIN_PATH = join(DIR_PATH,'../data/id_data_train')
-    VAL_PATH = join(DIR_PATH,'../data/id_data_val')
+def split_val_training(ratio_val=0.1, name='medium'):
+    TRAIN_PATH = join(DIR_PATH, 'data',  name + '_train')
+    VAL_PATH = join(DIR_PATH, 'data',  name + '_val')
     os.mkdir(VAL_PATH)
     list_train = os.listdir(TRAIN_PATH)
     n = len(list_train)
@@ -289,14 +290,27 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "../data/wikipaintings_full"
-    dest_path = "../data/wiki_small_2_"
-    cur_time = time.strftime("%d%m%y_%H%M")
-    get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
+    #path = "../data/wikipaintings_full"
+    #dest_path = "../data/wiki_small_2_"
+    #cur_time = time.strftime("%d%m%y_%H%M")
+    #get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
     #class_path = "../data/wikipaintings_class_labels.txt"
     #generate_image_id_file("../data/wikipaintings_full_image.csv", "../data/wikipaintings_full", class_path)
+    #print(DIR_PATH)
+    #split_test_training()
+    #split_val_training()
+    import numpy as np
+    from keras.preprocessing.image import load_img
+    DATA_PATH = join(DIR_PATH,'data/medium_train')
+    s = np.array([0.,0.,0.])
+    t=0
+    for file in os.listdir(DATA_PATH):
+        x = load_img(join(DATA_PATH, file), target_size=(224, 224))
+        s += np.mean(x, axis=(0, 1))
+        t += 1
 
-
+    mean = s/t
+    print(mean)
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"
     # generate_image_id_file(val_file_name, path_val, name)

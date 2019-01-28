@@ -15,6 +15,7 @@ from os import listdir
 from os.path import join
 import numpy as np
 from bokeh.plotting import figure, show, output_file
+import pickle
 
 
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
@@ -67,19 +68,19 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
             y_pred.append([a for a in args_sorted[:top_k]])
             i += 1
             bar.update(i)
-    return np.asarray(y_pred), y_true
+    return y_true, np.asarray(y_pred)
 
 
 def get_confusion_matrix(y_true, y_pred, show=False): # output of get_y_prediction
     cm = confusion_matrix(y_true, y_pred)
     if show:
         plt.figure(figsize=(10, 8))
-        sns.heatmap(cm, annot=True, fmt="d", cmap=sns.color_palette("#444444"))
-    '''
+        sns.heatmap(cm, annot=True, fmt="d", cmap='Blues')
+
     dico = get_dico()
 
     new_conf_arr = []
-    for row in conf_arr:
+    for row in cm:
         new_conf_arr.append(row / sum(row))
 
     plt.matshow(new_conf_arr)
@@ -88,7 +89,7 @@ def get_confusion_matrix(y_true, y_pred, show=False): # output of get_y_predicti
     plt.colorbar()
     plt.show()
     
-    '''
+
     return cm
 
 
@@ -197,8 +198,10 @@ def display_cm_hover(model_path, y_true, y_pred):
 
             if name1 == name2:
                 color.append(colormap[0])
-            #else:
-             #   color.append('lightgrey')
+            elif abs(i-j) < 5:
+                color.append(colormap[1])
+            else:
+                color.append('lightgrey')
 
     data = dict(
         xname=xname,
@@ -210,7 +213,7 @@ def display_cm_hover(model_path, y_true, y_pred):
     p = figure(title="Confusion Matrix",
                x_axis_location="above", tools="hover,save",
                x_range=list(reversed(names)), y_range=names,
-               tooltips=[('true', '@yname'),( 'pred', '@xname'), ('count', '@count')])
+               tooltips=[('T/P', '@yname, @xname'), ('count', '@count')])
 
     p.plot_width = 800
     p.plot_height = 800
@@ -222,7 +225,7 @@ def display_cm_hover(model_path, y_true, y_pred):
     p.xaxis.major_label_orientation = np.pi / 3
 
     p.rect('xname', 'yname', 0.9, 0.9, source=data,
-           color='colors', alpha='alphas', line_color=None,
+           color='colors', line_color=None,
            hover_line_color='black', hover_color='colors')
     file_name = 'conf_' + name
     output_file(file_name + '.html', title=file_name)
@@ -264,3 +267,67 @@ def get_classification_report(y_true, y_pred, name, title):
     plt.show()
     # from https://medium.com/district-data-labs/visual-diagnostics-for-more-informed-machine-learning-7ec92960c96b
 
+def plot_history(history):
+    loss_list = history['loss']
+    val_loss_list = history['val_loss']
+    acc_list = history['acc']
+    val_acc_list = history['val_acc']
+
+    if len(loss_list) == 0:
+        print('Loss is missing in history')
+        return
+        ## As loss always exists
+    epochs = range(1, len(loss_list) + 1)
+
+    ## Loss
+    plt.figure(1)
+    plt.plot(epochs, loss_list, 'b',
+             label='Training loss (' + str(str(format(loss_list[-1], '.5f')) + ')'))
+    plt.plot(epochs, val_loss_list, 'g',
+             label='Validation loss (' + str(str(format(val_loss_list[-1], '.5f')) + ')'))
+
+    plt.title('Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    ## Accuracy
+    plt.figure(2)
+    plt.plot(epochs, acc_list, 'b',label='Training accuracy (' + str(format(acc_list[-1], '.5f')) + ')')
+    plt.plot(epochs, val_acc_list, 'g', label='Validation accuracy (' + str(format(val_acc_list[-1], '.5f')) + ')')
+
+    plt.title('Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.show()
+
+
+def decode_image_autoencoder(model_path, img_path):
+    autoencoder = load_model(model_path)
+    img = load_img(img_path)
+    x = img_to_array(img)
+    dec = autoencoder.predict(x)  # Decoded image
+    x = x[0]
+    dec = dec[0]
+    x = (x.transpose((1, 2, 0)) * 255).astype('uint8')
+    dec = (dec.transpose((1, 2, 0)) * 255).astype('uint8')
+
+    plt.imshow(np.hstack((x, dec)))
+    plt.title('Original and reconstructed images')
+    plt.show()
+
+if __name__ == '__main__':
+    # his = pickle.load(open('../models/test1_1-17-22-22_empty-no-0/retrain-tune-0/07-0.158._tune-full1-no-2/history.pck', 'rb'))
+    # print(his)
+    # plot_history(his)
+    # resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5
+    MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"
+    y_true, y_pred = get_y_prediction(MODEL_PATH,"../data/wiki_small_2_0/small_test")
+    get_confusion_matrix(y_true, y_pred, show=True)
+    #display_cm_hover(MODEL_PATH, y_true, y_pred)
+    #print(get_dico())
+    #names = list(get_dico().keys())
+    #print(names)
+    #print("in format")
+    #print(list(reversed(names)))
