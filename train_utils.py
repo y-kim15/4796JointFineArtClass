@@ -22,7 +22,8 @@ N_CLASSES = 25
 # Code influenced by keras application examples
 # that from rasta and from ...
 
-def get_autoencoder1(input_shape, pretrained=False):
+
+def get_autoencoder1(input_shape,  add_reg, alpha, dropout=0.5, pretrained=False):
     input = Input(shape=input_shape)
 
     x = Conv2D(16, 3, 3, activation='relu', border_mode='same')(input)
@@ -184,7 +185,7 @@ def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
     x = base_model.output
     x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
-    x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    x = Dense(128, activation='relu')(x) # , kernel_regularizer=add_reg(alpha))(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
     # up to above
@@ -232,6 +233,8 @@ def save_summary(dir_path, name, model):
 def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
     if function == 'vgg16' or function == 'resnet50':
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
+    elif function == 'auto1':
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_id_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
 
@@ -314,14 +317,22 @@ def scale_preprocess_input(x):
     x *= 1./255
     return x
 
+# zero-center by mean pixel calculated for id_medium_train
+def scale_id_preprocess_input(x):
+    x[:, :, 0] -= 115.247
+    x[:, :, 1] -= 104.962
+    x[:, :, 2] -= 91.913
+    x *= 1./255
+    return x
+
 
 def wp_preprocess_input(x):
     # 'RGB'->'BGR'
     x = x[:, :, ::-1]
 
     x[:, :, 0] -= 133.104
-    x[:, :, 0] -= 119.973
-    x[:, :, 0] -= 104.432
+    x[:, :, 1] -= 119.973
+    x[:, :, 2] -= 104.432
     return x
 
 

@@ -3,12 +3,12 @@ import os
 from os.path import join
 import argparse
 import re
-import pickle
+import pickle, json
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
-from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay
+from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay, fixed_generator
 from rasta.python.models.processing import count_files
 from processing.clean_csv import create_dir
 from keras import backend as K
@@ -36,9 +36,9 @@ parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', 
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
 parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|v|rate|step|exp]')
-parser.add_argument('-r', action="store", default='l2', dest='add_reg', help='Add regularisation in Conv layers [none|l1|l2]')
+parser.add_argument('-r', action="store", default='none', dest='add_reg', help='Add regularisation in Conv layers [none|l1|l2]')
 parser.add_argument('--alp', action="store", default=0.01, type=float, dest='alpha', help='Value of Alpha for regularizer')
-parser.add_argument('--dropout', action="store", default=0.2, type=float, dest='add_drop', help='Add dropout rate [0-1]')
+parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
 parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
 
 args = parser.parse_args()
@@ -67,9 +67,9 @@ else:
     REG = l2
 
 changed = False
-TRAIN_PATH = join(PATH, "data/wikipaintings_full/wikipaintings_train")
+TRAIN_PATH = join(PATH, "data/medium_train")#wikipaintings_full/wikipaintings_train")
 # join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wikipaintings_full/wikipaintings_val")  # + str(SAMPLE_N), "small_val")
+VAL_PATH = join(PATH,"data/medium_val")# "data/wikipaintings_full/wikipaintings_val")  # + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
@@ -134,19 +134,28 @@ except:
     pass
 
 if train_type == 'empty' or changed:
-    model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
+    if MODEL_TYPE == 'auto1':
+        model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy')
+    else:
+        model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
 elif LR != 0.001:
     K.set_value(model.optimizer.lr, LR)
 
 save_summary(dir_path, name, model)
-with open(join(dir_path, name + '.json'), 'w') as json_file:
+with open(join(dir_path, '_model.json'), 'w') as json_file:
     json_file.write(model.to_json())
+with open(join(dir_path, '_param.json'), 'w') as json_file:
+    json.dump(vars(args), json_file)  # json_file.write(vars(args))
 
 val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                               horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
 earlyStop = EarlyStopping(monitor='val_acc', patience=5)
 if VAL_PATH != None:
+    if MODEL_TYPE == 'auto1':
+        history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
+                                      epochs=N_EPOCHS, validation_data=val_generator,
+                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
 
     checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                  verbose=1, save_best_only=True, mode='max')
