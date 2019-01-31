@@ -1,12 +1,13 @@
-from keras.models import Sequential
+from keras.models import Sequential, Model
 from keras.applications.inception_v3 import InceptionV3
 from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.applications.resnet50 import ResNet50
-from keras.initializers import glorot_uniform
+from keras.initializers import glorot_uniform, VarianceScaling
 from keras.regularizers import l2
 from keras.preprocessing.image import ImageDataGenerator
 from keras.constraints import MaxNorm
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, GlobalAveragePooling2D, UpSampling2D
+from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, \
+    GlobalAveragePooling2D, UpSampling2D, BatchNormalization, Activation, ZeroPadding2D
 from keras.optimizers import Adam, RMSprop, Adadelta, SGD
 from contextlib import redirect_stdout
 import datetime
@@ -14,7 +15,7 @@ import os
 from os.path import join
 import math
 from keras.preprocessing.image import load_img, img_to_array
-import numpy as np
+import re
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
@@ -22,53 +23,41 @@ N_CLASSES = 25
 # Code influenced by keras application examples
 # that from rasta and from ...
 
+def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
+    input = Input(shape=input_shape)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='')
 
-def get_autoencoder1(input_shape,  add_reg, alpha, dropout=0.5, pretrained=False):
+# resnet
+def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
 
-    x = Conv2D(16, 3, 3, activation='relu', border_mode='same')(input)
-    x = MaxPooling2D((2, 2), border_mode='same')(x)
-    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
-    x = MaxPooling2D((2, 2), border_mode='same')(x)
-    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
-    encoded = MaxPooling2D((2, 2), border_mode='same')(x)
+    x = Conv2D(64, (7, 7), strides=(2, 2), activation='relu', data_format='channels_last',
+               kernel_initializer=VarianceScaling(scale=2.0))(input)
+    x = BatchNormalization(axis=3)
+    x = ZeroPadding2D()
+    x = MaxPooling2D((3, 3), strides=(2, 2))(x)
+    x = Conv2D(64, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
+    x = BatchNormalization(axis=3)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same', kernel_initializer=VarianceScaling(scale=2.0))(x)
+    x = BatchNormalization(axis=3)
+    x = Conv2D(256, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
+    encoded = MaxPooling2D((2, 2))(x)
 
     # at this point the representation is (8, 4, 4) i.e. 128-dimensional
 
-    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(encoded)
+    x = Conv2D(256, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(encoded)
     x = UpSampling2D((2, 2))(x)
-    x = Conv2D(8, 3, 3, activation='relu', border_mode='same')(x)
-    x = UpSampling2D((2, 2))(x)
-    x = Conv2D(16, 3, 3, activation='relu', border_mode='same')(x)
-    x = UpSampling2D((2, 2))(x)
+    x = BatchNormalization(axis=3)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same', kernel_initializer=VarianceScaling(scale=2.0))(x)
+    x = BatchNormalization(axis=3)
+    x = Conv2D(64, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
+    x = UpSampling2D((3, 3))(x)
     decoded = Conv2D(3, 3, 3, activation='sigmoid', border_mode='same')(x)
 
     return input, decoded
 
 
-def get_alexnet(input_shape):
-        inputs = Input(shape=(227, 227, 3))
-
-        conv_1 = Conv2D(96, (11, 11), strides=(4, 4),  activation='relu', name='conv_1',
-                        kernel_initializer='he_normal', input_shape=input_shape)
-        conv_2 = MaxPooling2D((3, 3), strides=(2, 2))
-
-        x = Sequential()
-        x.add(conv_1)
-        x.add(conv_2)
-        x.add(Flatten())
-        x.add(Dense(256, activation='relu'))
-        x.add(Dropout(0.5))
-        x.add(Dense(256, activation='relu'))
-        x.add(Dropout(0.5))
-        x.add(Dense(N_CLASSES, activation='softmax'))
-
-        alexnet = x
-        alexnet.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        print(alexnet.summary())
-
-
-def get_test1(input_shape, add_reg, alpha, dropout=0.5, pretrained=False):
+def get_test1(input_shape, add_reg, alpha, dropout=0.0, pretrained=False):
     # architecture follows general CNN design
 
     base_model = Sequential()
@@ -84,8 +73,8 @@ def get_test1(input_shape, add_reg, alpha, dropout=0.5, pretrained=False):
     base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
     if dropout > 0:
         base_model.add(Dropout(dropout))
-    base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(1)))
-    base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(1)))
+    base_model.add(Dense(56, activation='relu', kernel_initializer=glorot_uniform(0)))
+    base_model.add(Dense(N_CLASSES, activation='softmax', kernel_initializer=glorot_uniform(0)))
 
     return base_model, base_model.output
 
@@ -121,15 +110,13 @@ def get_test3(input_shape, add_reg=l2, alpha=0.01, dropout=0.2, pretrained=False
     base_model.add(InputLayer(input_shape))
     base_model.add(Conv2D(64, (5, 5), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0),
                           kernel_regularizer=add_reg(alpha)))
+    base_model.add(Conv2D(64, (3, 3), strides=(2, 2), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
-                          kernel_regularizer=add_reg(alpha)))
-    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0)))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', padding='valid',  kernel_initializer=glorot_uniform(0)))
     base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0),
-                          kernel_regularizer=add_reg(alpha)))
-    # base_model.add(Conv2D(256, (3, 3), strides=(2, 2), activation='relu', kernel_initializer=glorot_uniform(0)))
-    base_model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    base_model.add(Conv2D(128, (3, 3), strides=(2, 2), activation='relu', padding='valid', kernel_initializer=glorot_uniform(0)))
+    base_model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), data_format='channels_last'))
 
     # out = Sequential()
     base_model.add(Flatten(input_shape=base_model.output_shape[1:]))
@@ -203,20 +190,45 @@ get_model = {
     "auto1": get_autoencoder1
 }
 
+def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
+    data_type = True
+    base_model, output = get_model[model_type](input_shape, reg, alpha, drop, pretrained)
+    if re.search('test*', model_type):
+        model = Model(inputs=base_model.input, outputs=base_model.output)
+    elif model_type == 'auto1':
+        data_type = False
+        model = Model(base_model, output)
+    elif model_type == 'vgg16':
+        model = Model(inputs=base_model.input, outputs=output(base_model.output))
+    else:
+        model = Model(inputs=base_model.input, outputs=output)
+    return model, data_type
 
-def get_model_name(sample_no, empty=True, model_type='test1', n_tune=0, **kwargs):
-    if empty:
+def copy_weights(old_model, new_model, layer_no):
+    i = 0
+    j = layer_no
+    if layer_no > 0:
+        j = len(old_model.layers) - layer_no
+    for layer in old_model.layers:
+        if i == j:
+            continue
+        new_model.layers[i].set_weights(old_model.layers[i].get_weights())
+        i += 1
+    return new_model
+
+def get_model_name(sample_no, type='empty', model_type='test1', n_tune=0, **kwargs):
+    if type == 'empty':
         now = datetime.datetime.now()
         name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
         name = name + "_empty"
     else:
-        name = kwargs["name"].rsplit("_", 1)[0]  # just get model_type_time form
+        name = kwargs["name"].rsplit("_", 1)[0] + '_' + type  # just get model_type_time form
     if n_tune == 0:
         tune = 'full1'
     else:
         tune = str(n_tune)
-    name = name + '_tune-' + tune
-    name = name + "-no-" + str(sample_no)
+    name = name + '_layers-' + tune
+    name = name + "-s-" + str(sample_no)
     return name
 
 def save_summary(dir_path, name, model):
@@ -267,7 +279,7 @@ def step_decay(epoch):
 
 # learning rate schedule
 def exp_decay(epoch):
-   initial_lrate = 0.1
+   initial_lrate = 0.01
    k = 0.1
    lrate = initial_lrate * math.exp(-k * epoch)
    return lrate

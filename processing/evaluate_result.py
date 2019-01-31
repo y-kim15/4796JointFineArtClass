@@ -74,7 +74,7 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
 def get_confusion_matrix(y_true, y_pred, show=False): # output of get_y_prediction
     cm = confusion_matrix(y_true, y_pred)
     if show:
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(12, 10))
         sns.heatmap(cm, annot=True, fmt="d", cmap='Blues')
 
     dico = get_dico()
@@ -182,38 +182,38 @@ def display_cm_hover(model_path, y_true, y_pred):
     names = list(get_dico().keys())
     N = len(names)
     counts = np.zeros((N, N))
+    total = 0
     for i in range(N):
         for j in range(N):
             counts[i, j] = cm[i][j]
+            total += counts[i, j]
     colormap = ["#444444", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
                 "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a"]
 
     xname = []
     yname = []
     color = []
+    alpha = []
     for i, name1 in enumerate(names):
         for j, name2 in enumerate(names):
             xname.append(name1)
             yname.append(name2)
 
-            if name1 == name2:
-                color.append(colormap[0])
-            elif abs(i-j) < 5:
-                color.append(colormap[1])
-            else:
-                color.append('lightgrey')
+            alpha.append(counts[i, j]/cm.sum(axis=1)[i])
+            color.append("#79145a")
 
     data = dict(
         xname=xname,
         yname=yname,
         colors=color,
+        alphas=alpha,
         count=counts.flatten(),
     )
 
     p = figure(title="Confusion Matrix",
                x_axis_location="above", tools="hover,save",
                x_range=list(reversed(names)), y_range=names,
-               tooltips=[('T/P', '@yname, @xname'), ('count', '@count')])
+               tooltips=[('True', '@yname'), ( 'Predicted' ,'@xname'), ('Count', '@count')])
 
     p.plot_width = 800
     p.plot_height = 800
@@ -225,7 +225,7 @@ def display_cm_hover(model_path, y_true, y_pred):
     p.xaxis.major_label_orientation = np.pi / 3
 
     p.rect('xname', 'yname', 0.9, 0.9, source=data,
-           color='colors', line_color=None,
+           color='colors', alpha='alphas', line_color=None,
            hover_line_color='black', hover_color='colors')
     file_name = 'conf_' + name
     output_file(file_name + '.html', title=file_name)
@@ -318,13 +318,13 @@ def decode_image_autoencoder(model_path, img_path):
     plt.show()
 
 if __name__ == '__main__':
-    # his = pickle.load(open('../models/test1_1-17-22-22_empty-no-0/retrain-tune-0/07-0.158._tune-full1-no-2/history.pck', 'rb'))
+    his = pickle.load(open('../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
     # print(his)
-    # plot_history(his)
+    plot_history(his)
     # resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5
-    MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"
-    y_true, y_pred = get_y_prediction(MODEL_PATH,"../data/wiki_small_2_0/small_test")
-    get_confusion_matrix(y_true, y_pred, show=True)
+    #MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"
+    #y_true, y_pred = get_y_prediction(MODEL_PATH,"../data/wiki_small_2_1/small_test")
+    #get_confusion_matrix(y_true, y_pred, show=True)
     #display_cm_hover(MODEL_PATH, y_true, y_pred)
     #print(get_dico())
     #names = list(get_dico().keys())

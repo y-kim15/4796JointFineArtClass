@@ -82,12 +82,13 @@ class Clean:
         # for(new, old) in zip (new_data["agent_display"], data["agent_display"]):
         artist_count = {}
         work_count = {}
-        temp_i = -1
         for old in df[col_name]:
             if old == current:
                 current_j += 1
             else:
                 temp_i = current_i
+                if current_i in artist_count:
+                    artist_count[current_i] = current_j
                 if old in artist_count:
                     current_i = artist_count[old]
                     current_j = work_count[current_i] + 1
@@ -381,5 +382,9 @@ if __name__ == '__main__':
     #data = Clean.convert_name_order(data, "agent_display")
     #data.to_csv("../data/id_full_large.csv", header=headers, index=False)
     #Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
-    Clean.download_image_database("../data/filtered_full_large11.csv", "../data/id_database_medium")
+    #Clean.download_image_database("../data/filtered_full_large11.csv", "../data/id_database_medium")
     # filtered_full_large2 here since first created files rows are removed, added option to ignore if the file already exists
+    data = pandas.read_csv("../data/wikipaintings_full_image.csv", header=0)
+    headers = list(data[:0])
+    data = Clean.assign_id(data, "agent_display")
+    data.to_csv("../data/id_wiki_full_large.csv", header=headers, index=False)

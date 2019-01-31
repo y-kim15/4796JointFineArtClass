@@ -2,13 +2,13 @@ import tensorflow as tf
 import os
 from os.path import join
 import argparse
-import re
+import time
 import pickle, json
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
-from train_utils import get_model_name, get_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay, fixed_generator
+from train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay, copy_weights
 from rasta.python.models.processing import count_files
 from processing.clean_csv import create_dir
 from keras import backend as K
@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(description='Description')
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
 parser.add_argument('--new_m', action="store", default='N', dest='new_path', help='Save in a new directory [Y|N]')
-parser.add_argument('--model_type', action='store', default='test1', dest='model_type', help='Type of model [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]')
+parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not [True|False]')
@@ -37,9 +37,10 @@ parser.add_argument('--opt', action="store", default='adam', dest='optimiser', h
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
 parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|v|rate|step|exp]')
 parser.add_argument('-r', action="store", default='none', dest='add_reg', help='Add regularisation in Conv layers [none|l1|l2]')
-parser.add_argument('--alp', action="store", default=0.01, type=float, dest='alpha', help='Value of Alpha for regularizer')
+parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', help='Value of Alpha for regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
 parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
+parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
 
 args = parser.parse_args()
 print("Args: ", args)
@@ -67,40 +68,37 @@ else:
     REG = l2
 
 changed = False
-TRAIN_PATH = join(PATH, "data/medium_train")#wikipaintings_full/wikipaintings_train")
-# join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH,"data/medium_val")# "data/wikipaintings_full/wikipaintings_val")  # + str(SAMPLE_N), "small_val")
+TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
 if train_type != 'empty':
     # MODEL_TYPE = ''
-    if args.model_path is None:
+    MODEL_PATH = args.model_path
+    if MODEL_PATH is None:
         print("Error: model path should be provided for retraining/tuning.")
     else:
         MODEL_PATH = args.model_path
+
     name = MODEL_PATH.rsplit('/', 1)[1].replace('hdf5', '')
     model = load_model(MODEL_PATH)
-    name = get_model_name(SAMPLE_N, empty=False, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
+    name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
+    if train_type == 'tune':
+        new_model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=True)
+        model = copy_weights(model, new_model, args.layer_no)
+        changed = True
     if args.new_path == 'Y':
         dir_path = join(MODEL_PATH.split('/')[0], MODEL_PATH.split('/')[1], train_type +'-tune-'+str(N_TUNE), name)
     else:
         dir_path = join(MODEL_PATH.rsplit('/', 1)[0], name)
     create_dir(dir_path)
+
 else:
     MODEL_TYPE = args.model_type
     MODEL_PATH = None
-    base_model, output = get_model[MODEL_TYPE](INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=True)
-    if re.search('test*', MODEL_TYPE):
-        model = Model(inputs=base_model.input, outputs=base_model.output)
-    elif MODEL_TYPE == 'auto1':
-        DATA_TYPE = False
-        model = Model(base_model, output)
-    elif MODEL_TYPE == 'vgg16':
-        model = Model(inputs=base_model.input, outputs=output(base_model.output))
-    else:
-        model = Model(inputs=base_model.input, outputs=output)
-    name = get_model_name(SAMPLE_N, model_type=MODEL_TYPE, n_tune=N_TUNE)
+    model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=True)
+    name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, n_tune=N_TUNE)
     dir_path = join("models", name)
     create_dir(dir_path)
 
@@ -121,10 +119,6 @@ else:
 
 params = vars(args)
 
-if MODEL_TYPE == "vgg":
-    pre_type = True
-else:
-    pre_type = False
 train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                                 horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 try:
@@ -135,7 +129,7 @@ except:
 
 if train_type == 'empty' or changed:
     if MODEL_TYPE == 'auto1':
-        model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy')
+        model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='mean_squared_error')
     else:
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
 elif LR != 0.001:
@@ -150,7 +144,8 @@ with open(join(dir_path, '_param.json'), 'w') as json_file:
 val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                               horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
-earlyStop = EarlyStopping(monitor='val_acc', patience=5)
+earlyStop = EarlyStopping(monitor='val_acc', patience=10)
+start = time.time()
 if VAL_PATH != None:
     if MODEL_TYPE == 'auto1':
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
@@ -175,8 +170,9 @@ if VAL_PATH != None:
 else:
     history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                   epochs=N_EPOCHS)
-
+end =time.time()
 model.save(join(dir_path, name + ".hdf5"))
+print("Time elapsed: ", str(end - start))
 with open(join(dir_path,'history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()
