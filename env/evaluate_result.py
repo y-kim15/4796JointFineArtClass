@@ -20,12 +20,12 @@ from sklearn.preprocessing import label_binarize
 import os
 
 
-MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
+MODEL_PATH = "models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
     #IMG_PATH = "../data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
     #get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=100, plot_size=(8, 8))
 
 DEFAULT_MODEL_PATH = MODEL_PATH
-DEFAULT_SAVE_PATH = "../models/eval"
+DEFAULT_SAVE_PATH = "models/eval"
 N_CLASSES = 25
 
 parser = argparse.ArgumentParser(description='Description')
