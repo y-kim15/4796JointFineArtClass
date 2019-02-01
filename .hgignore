@@ -1,9 +1,9 @@
-data/wiki_*
+data/*
 rasta/python/__pycache__
 rasta/python/models/__pycache__
 rasta/python/utils/__pycache__
 __pycache__
-lib
+lib/*
 lib64
 include
 cleaning/inception_*
@@ -12,3 +12,11 @@ cleaning/__pycache__
 summary_*
 vgg16_*
 .xlsx
+pip-selfcheck.json
+pyvenv.cfg
+models/*
+test1_*
+small.db
+cleaning/*.db
+cleaning/*.csv
+processing/*.json
