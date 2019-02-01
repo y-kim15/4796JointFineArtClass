@@ -5,6 +5,7 @@ rasta/python/utils/__pycache__
 rasta/models/*
 __pycache__
 lib/python3.6
+bin
 lib64
 include
 cleaning/inception_*
