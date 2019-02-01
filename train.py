@@ -30,7 +30,7 @@ parser.add_argument('--new_m', action="store", default='N', dest='new_path', hel
 parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
-parser.add_argument('-f', action="store", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not [True|False]')
+parser.add_argument('-f', action="store_true", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not')
 parser.add_argument('-n', action="store", default=0, type=int,dest='n_layers_trainable',help='Set the number of last trainable layers')
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 10), metavar='[0-9]', help='Sample Number to use [0-9]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')

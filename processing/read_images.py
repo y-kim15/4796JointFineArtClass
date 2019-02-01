@@ -6,7 +6,6 @@ from processing.clean_csv import Clean
 import imageio
 import math
 import random
-import time
 from os.path import join, exists
 from random import shuffle
 from shutil import copyfile,move, copy, rmtree

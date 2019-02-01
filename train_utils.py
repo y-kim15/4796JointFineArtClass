@@ -211,7 +211,7 @@ def copy_weights(old_model, new_model, layer_no):
         j = len(old_model.layers) - layer_no
     for layer in old_model.layers:
         if i == j:
-            continue
+            break
         new_model.layers[i].set_weights(old_model.layers[i].get_weights())
         i += 1
     return new_model
