@@ -1,4 +1,11 @@
-data/*
+env/data/id*
+env/data/wiki*
+env/data/medium*
+env/data/filtered*
+env/models/logs
+env/models/test*
+env/models/vgg*
+env/models/resnet50_
 rasta/python/__pycache__
 rasta/python/models/__pycache__
 rasta/python/utils/__pycache__
@@ -16,8 +23,6 @@ vgg16_*
 .xlsx
 pip-selfcheck.json
 pyvenv.cfg
-models/*
-test1_*
 small.db
 cleaning/*.db
 cleaning/*.csv

@@ -276,7 +276,11 @@ def split_val_training(ratio_val=0.1, name='medium'):
         DEST_PATH = join(VAL_PATH, f)
         move(SRC_PATH, DEST_PATH)
 
-
+def count_files(dir_path):
+    n = 0
+    for t in list(os.walk(dir_path)):
+        n += len(t[2])
+    return n
 
 if __name__ == '__main__':
     # path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"

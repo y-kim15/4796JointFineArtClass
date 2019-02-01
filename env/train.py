@@ -8,9 +8,9 @@ from keras.models import Sequential, Model, load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
-from train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay, copy_weights
-from rasta.python.models.processing import count_files
+from processing.train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, get_optimiser, exp_decay, copy_weights
 from processing.clean_csv import create_dir
+from processing.read_images import count_files
 from keras import backend as K
 
 config = tf.ConfigProto(allow_soft_placement=True)
@@ -30,16 +30,16 @@ parser.add_argument('--new_m', action="store", default='N', dest='new_path', hel
 parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
-parser.add_argument('-f', action="store_true", default=False, type=bool,dest='horizontal_flip',help='Set horizontal flip or not')
+parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
 parser.add_argument('-n', action="store", default=0, type=int,dest='n_layers_trainable',help='Set the number of last trainable layers')
-parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 10), metavar='[0-9]', help='Sample Number to use [0-9]')
+parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 5), metavar='[0-4]', help='Sample Number to use [0-4]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
-parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
-parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [none|v|rate|step|exp]')
-parser.add_argument('-r', action="store", default='none', dest='add_reg', help='Add regularisation in Conv layers [none|l1|l2]')
-parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', help='Value of Alpha for regularizer')
-parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
-parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
+parser.add_argument('-lr', action="store", default=0.001, type=float, choices=range(0,1),dest='lr', help='Learning Rate for Optimiser')
+parser.add_argument('--decay', action="store", default='none', dest='add_decay', choices=['none', 'rate', 'step', 'rate', 'dec'], help='Add decay to Learning Rate for Optimiser')
+parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
+parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', choices=range(0,1), metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
+parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', choices=range(0,1), metavar='[0.0-1.0]', help='Add dropout rate')
+parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', choices=range(0,1),metavar='[0.0-1.0]', help='Add momentum to SGD')
 parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
 
 args = parser.parse_args()

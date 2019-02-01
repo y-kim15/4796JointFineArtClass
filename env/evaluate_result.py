@@ -7,7 +7,7 @@ from matplotlib.colors import ListedColormap
 import seaborn as sns
 from keras import metrics
 from progressbar import ProgressBar
-from train_utils import imagenet_preprocess_input, wp_preprocess_input
+from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input
 from processing.read_images import count_files
 from os import listdir
 from os.path import join
@@ -20,28 +20,36 @@ from sklearn.preprocessing import label_binarize
 import os
 
 
+MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
+    #IMG_PATH = "../data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
+    #get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=100, plot_size=(8, 8))
 
+DEFAULT_MODEL_PATH = MODEL_PATH
+DEFAULT_SAVE_PATH = "../models/eval"
 N_CLASSES = 25
+
+parser = argparse.ArgumentParser(description='Description')
+
+# parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model]')
+parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
+parser.add_argument('-d', action="store", dest="data_path",
+                    default="../data/wikipaintings_small/wikipaintings_test", help="Path of test data")
+parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
+parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
+parser.add_argument('-pr', action="store_true", dest='get_pr', default=False, help='Get Precision Recall Curve')
+parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
+                    help='Get Classification Report')
+parser.add_argument('-show', action="store_true", dest='show_g', default=False, help='Display graphs')
+parser.add_argument('-save', action="store", default=DEFAULT_SAVE_PATH, dest='save_path',
+                    help='Save graphs, give save location')
+# parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
+# parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
+# parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
+args = parser.parse_args()
+
 
 
 def evaluate():
-    parser = argparse.ArgumentParser(description='Description')
-
-    # parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model]')
-    parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
-    parser.add_argument('-d', action="store", dest="data_path",
-                        default="../data/wikipaintings_small/wikipaintings_test", help="Path of test data")
-    parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
-    parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
-    parser.add_argument('-pr', action="store_true", dest='get_pr', default=False, help='Get Precision Recall Curve')
-    parser.add_argument('--report', action="store_true", dest='get_class_report',default=False, help='Get Classification Report')
-    parser.add_argument('-show', action="store_true", dest='show_g', default=False, help='Display graphs')
-    parser.add_argument('-save', action="store", default=DEFAULT_SAVE_PATH, dest='save_path',
-                        help='Save graphs, give save location')
-    # parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
-    # parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
-    # parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
-    args = parser.parse_args()
     MODEL_PATH = args.model_path
     DATA_PATH = args.data_path
     k = (str(args.top_k)).split(",")
@@ -64,7 +72,7 @@ def evaluate():
         get_classification_report(y_true, y_pred, name, 'classification report: ' + name, show=SHOW, save=SAVE, path=SAVE_PATH)
 
 
-
+evaluate()
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
 
 
@@ -182,7 +190,7 @@ def get_confusion_matrix(y_true, y_pred, show=False, normalise=True, save=True, 
     if show:
         plt.show()
     plt.show()
-    
+
 
     return cm
 
@@ -437,20 +445,12 @@ def get_dico():
 def invert_dico(dico):
     return {v: k for k, v in dico.items()}
 
-if __name__ == '__main__':
+
     #his = pickle.load(open('../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
     # print(his)
     #plot_history(his)
     # resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5
     #MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"
-    MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-    #IMG_PATH = "../data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
-    #get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=100, plot_size=(8, 8))
-
-    DEFAULT_MODEL_PATH = MODEL_PATH
-    DEFAULT_SAVE_PATH = "../models/eval"
-    create_dir(DEFAULT_SAVE_PATH)
-    evaluate()
 
     #DIR_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1"
     #y_true, y_pred = get_y_prediction(MODEL_PATH,"../data/wikipaintings_small/wikipaintings_test")

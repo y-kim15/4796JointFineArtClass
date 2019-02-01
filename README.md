@@ -1,7 +1,11 @@
+# Fine-art Paintings Classification with Transfer Learning
+
 ### To set up the environment
-    source ./bin/activate
-    pip install -r requirements.txt
-Note that this automatically installs tensorflow-gpu for gpu support
+    cd env
+    python3 -m venv .
+    source bin/activate
+    pip install -r ../requirements.txt
+Note that this automatically installs tensorflow-gpu for GPU support
 
 ### Train a new model
     python3 train.py --model_type <model_type> -d <dataset index>
@@ -10,20 +14,31 @@ Note that this automatically installs tensorflow-gpu for gpu support
 ### Tune an existing model
     python3 train.py -t tune --model_type <model_type> -m <model_path> -n <n_tune> -d <dataset index>
 
-Required arguments:
-* --model_type <>: type of model to initialise (resnet50, vgg16, inceptionv3)
-Optional arguments:
-* -d <>: ith dataset to use for training (0-4) - default: 0
-* -b <>: batch size - default: 30
-* -e <>: number of epochs - default: 10
-* --opt <>: type of optimiser to use - default: Adam
-* --decay <> : adding decay (step|rate|<float>|exp) - default: None
-* -f : adding horizontal flip - default: False
-* -r <> : adding regularisation in Convolutional layers (none|l1|l2) - default: None
-* --alp <> : set value of alpha - default = 0.0
-* --dropout <> : adding dropout layer as a penultimate layer, define rate - default: 0.0
-* --mom <> : set momentum if SGD is chosen - default: 0.0
-* -ln <>: set last N layers to reinitialise with rest copied to a new model
+````
+optional arguments:
+  -h, --help            show this help message and exit
+  -t TRAIN_TYPE         Training type [empty|retrain|tune] - (default: empty)
+  -m MODEL_PATH         Path of the model file
+  --new_m NEW_PATH      Save in a new directory [Y|N]
+  --model_type MODEL_TYPE
+                        Type of model
+                        [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]
+  -b BATCH_SIZE         Size of the batch. - (default: 30)
+  -e EPOCHS             Number of epochs - (default: 10)
+  -f                    Set horizontal flip or not 
+  -n N_LAYERS_TRAINABLE
+                        Set the number of last trainable layers
+  -d [0-4]              Sample Number to use [0-4]
+  --opt OPTIMISER       Optimiser [adam|rmsprop|adadelta|sgd]
+  -lr {0}               Learning Rate for Optimiser
+  --decay {none,rate,step,rate,dec}
+                        Add decay to Learning Rate for Optimiser
+  -r {none,l1,l2}       Add regularisation in Conv layers
+  --alp [0.0-1.0]       Value of Alpha for regularizer
+  --dropout [0.0-1.0]   Add dropout rate
+  --mom [0.0-1.0]       Add momentum to SGD
+  -ln LAYER_NO          Select the layer to replace
+````
 
 
 ### Evaluate the accuracy of model
@@ -32,10 +47,15 @@ Optional arguments:
 * Default model_path is the saved latest optimal model
 * Default data_path is data/wikipaintings_small/wikipaintings_test 
 
-Optional arguments:
-* -k : value of Top-k accuracy to find, can be written in comma separated values (e.g. -k 1,3,5)
-* -cm : get confusion matrix
-* -pr : get precision and recall curve
-* --class : get classification report containing accuracy, precision and recall per class
-* -show : display all plots on screen
-* -save <directory_path> : save all plots in <directory_path> - default: ../models/eval/<model_name>
+```
+optional arguments:
+  -h, --help       show this help message and exit
+  -m MODEL_PATH    Path of the model file - (default: current trained model)
+  -d DATA_PATH     Path of test data - (default: wikipaintings_small/wikipaintings_test)
+  -k TOP_K         Top-k accuracy to compute - (default: 1,3,5)
+  -cm              Get Confusion Matrix
+  -pr              Get Precision Recall Curve
+  --report         Get Classification Report
+  -show            Display graphs
+  -save SAVE_PATH  Save graphs, give save location - (default: models/eval/<model_name>)
+```
