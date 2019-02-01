@@ -1,1 +1,0 @@
-{'n_layers_trainable': 20, 'dropout_rate': -1.0, 'model_name': 'resnet', 'batch_size': 64, 'horizontal_flip': True, 'epochs': 120, 'preprocessing': 'imagenet', 'validation_path': '/home/bnegrevergne/rasta/data/wikipaintings_full/wikipaintings_val', 'training_path': '/home/bnegrevergne/rasta/data/wikipaintings_full/wikipaintings_train', 'disto': 0.4}
