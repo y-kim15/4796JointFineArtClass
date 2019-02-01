@@ -2,8 +2,9 @@ data/*
 rasta/python/__pycache__
 rasta/python/models/__pycache__
 rasta/python/utils/__pycache__
+rasta/models/*
 __pycache__
-lib/*
+lib/python3.6
 lib64
 include
 cleaning/inception_*
