@@ -435,7 +435,7 @@ def decode_image_autoencoder(model_path, img_path):
 def get_dico():
     classes = []
     PATH = os.path.dirname(__file__)
-    directory = join(PATH,'../../data/wikipaintings_small/wikipaintings_train')
+    directory = join(PATH,'data/wikipaintings_small/wikipaintings_train')
     for subdir in sorted(os.listdir(directory)):
         if os.path.isdir(os.path.join(directory, subdir)):
             classes.append(subdir)
