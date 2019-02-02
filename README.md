@@ -51,7 +51,7 @@ optional arguments:
 optional arguments:
   -h, --help       show this help message and exit
   -m MODEL_PATH    Path of the model file - (default: current trained model)
-  -d DATA_PATH     Path of test data - (default: wikipaintings_small/wikipaintings_test)
+  -d DATA_PATH     Path of test data - (default: data/wikipaintings_small/wikipaintings_test)
   -k TOP_K         Top-k accuracy to compute - (default: 1,3,5)
   -cm              Get Confusion Matrix
   -pr              Get Precision Recall Curve
