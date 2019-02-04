@@ -137,7 +137,7 @@ def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
 
     x = Sequential()
     x.add(Flatten(input_shape=base_model.output_shape[1:]))
-    #x.add(Dense(256, activation='relu'))
+    x.add(Dense(56, activation='relu'))
     if dropout > 0:
         x.add(Dropout(dropout))
     #x.add(Dense(512, activation='relu'))

@@ -57,5 +57,6 @@ optional arguments:
   -pr              Get Precision Recall Curve
   --report         Get Classification Report
   -show            Display graphs
-  -save SAVE_PATH  Save graphs, give save location - (default: models/eval/<model_name>)
+  -s               Save graphs
+  -save SAVE_PATH  Give save location - (default: models/eval/<model_name>)
 ```

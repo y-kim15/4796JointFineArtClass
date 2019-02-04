@@ -24,8 +24,7 @@ import itertools
 
 
 MODEL_PATH = "models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-# IMG_PATH = "../data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
-# get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=100, plot_size=(8, 8))
+IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
 DEFAULT_SAVE_PATH = "models/eval"
@@ -55,11 +54,13 @@ args = parser.parse_args()
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
 
 
-def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(8, 8)):
+def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
     # target size is the size of the image to load in
     # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
     model = load_model(model_path)
+
     outputs = [layer.output for layer in model.layers]
+    outputs = outputs[1:]
     print("number of layers", len(model.layers))
     act_model = Model(inputs=model.input, outputs=outputs)
     img = load_img(img_path, target_size=target_size)
@@ -70,14 +71,26 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(8, 8)):
     else:
         x = wp_preprocess_input(x)
     print("shape of x ", x.shape)
-    activations = act_model.predict(x[np.newaxis, :, :, :])
+    new_x = x[np.newaxis,:,:,:]
+    print("new shape of x ", x.shape)
+    activations = act_model.predict(new_x, batch_size=1)
     act = activations[layer_no]
     i = 0
-    fig, ax = plt.subplot(plot_size[0], plot_size[1], figsize=(plot_size[0] * 2.5, plot_size[1] * 1.5))
+    print("original")
+    plt.imshow(img)
+    print("plotsize 0, ", plot_size[0])
+    print("plotsize 1, ", plot_size[1])
+    #f = plt.figure(figsize=(plot_size[0]*2.5, plot_size[1]*1.5))
+    #ax = f.add_subplot(plot_size[0], plot_size[1], pow(plot_size[0],2), )
+    f, ax = plt.subplots(plot_size[0], plot_size[1], squeeze=False)
+    #fig, ax = plt.subplot(plot_size[0], plot_size[1], pow(plot_size[0],2), figsize=(plot_size[0] * 2.5, plot_size[1] * 1.5))
     for r in range(0, plot_size[0]):
         for c in range(0, plot_size[1]):
             ax[r][c].imshow(act[0, :, :, i])
             i += 1
+
+    plt.show()
+
 
 
 def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
@@ -445,6 +458,59 @@ def plot_history(history):
     plt.legend()
     plt.show()
 
+def plot_history_plotly(history):
+    import plotly.plotly as py
+    import plotly.graph_objs as go
+
+    loss_list = history['loss']
+    val_loss_list = history['val_loss']
+    acc_list = history['acc']
+    val_acc_list = history['val_acc']
+
+    if len(loss_list) == 0:
+        print('Loss is missing in history')
+        return
+        ## As loss always exists
+    epochs = range(1, len(loss_list) + 1)
+
+    # Add data
+    month = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+             'August', 'September', 'October', 'November', 'December']
+    high_2000 = [32.5, 37.6, 49.9, 53.0, 69.1, 75.4, 76.5, 76.6, 70.7, 60.6, 45.1, 29.3]
+    low_2000 = [13.8, 22.3, 32.5, 37.2, 49.9, 56.1, 57.7, 58.3, 51.2, 42.8, 31.6, 15.9]
+    high_2007 = [36.5, 26.6, 43.6, 52.3, 71.5, 81.4, 80.5, 82.2, 76.0, 67.3, 46.1, 35.0]
+    low_2007 = [23.6, 14.0, 27.0, 36.8, 47.6, 57.7, 58.9, 61.2, 53.3, 48.5, 31.0, 23.6]
+    high_2014 = [28.8, 28.5, 37.0, 56.8, 69.7, 79.7, 78.5, 77.8, 74.1, 62.6, 45.3, 39.9]
+    low_2014 = [12.7, 14.3, 18.6, 35.5, 49.9, 58.0, 60.0, 58.6, 51.7, 45.2, 32.2, 29.1]
+
+    # Create and style traces
+    trace0 = go.Scatter(
+        x=epochs,
+        y=loss_list,
+        name='Train Loss',
+        line=dict(
+            color=('rgb(205, 12, 24)'),
+            width=4)
+    )
+    trace1 = go.Scatter(
+        x=epochs,
+        y=val_loss_list,
+        name='Val Loss',
+        line=dict(
+            color=('rgb(22, 96, 167)'),
+            width=4, )
+    )
+
+    data = [trace0, trace1]
+
+    # Edit the layout
+    layout = dict(title='Average High and Low Temperatures in New York',
+                  xaxis=dict(title='Epochs'),
+                  yaxis=dict(title='Loss'),
+                  )
+
+    fig = dict(data=data, layout=layout)
+    py.iplot(fig, filename='styled-line')
 
 def decode_image_autoencoder(model_path, img_path):
     autoencoder = load_model(model_path)
@@ -500,7 +566,11 @@ def evaluate():
                                   path=SAVE_PATH)
     if args.get_pr:
         get_precision_recall(y_true, y_pred, name, SHOW)
-evaluate()
+
+
+
+get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=156)
+#evaluate()
 #his = pickle.load(open('models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
 #                       '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
 #print(his)

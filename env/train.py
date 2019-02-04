@@ -37,9 +37,9 @@ parser.add_argument('--opt', action="store", default='adam', dest='optimiser', h
 parser.add_argument('-lr', action="store", default=0.001, type=float, choices=range(0,1),dest='lr', help='Learning Rate for Optimiser')
 parser.add_argument('--decay', action="store", default='none', dest='add_decay', choices=['none', 'rate', 'step', 'rate', 'dec'], help='Add decay to Learning Rate for Optimiser')
 parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
-parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', choices=range(0,1), metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
-parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', choices=range(0,1), metavar='[0.0-1.0]', help='Add dropout rate')
-parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', choices=range(0,1),metavar='[0.0-1.0]', help='Add momentum to SGD')
+parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
+parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
+parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
 parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
 
 args = parser.parse_args()
@@ -140,13 +140,14 @@ with open(join(dir_path, '_model.json'), 'w') as json_file:
     json_file.write(model.to_json())
 with open(join(dir_path, '_param.json'), 'w') as json_file:
     json.dump(vars(args), json_file)  # json_file.write(vars(args))
+model.save_weights(join(dir_path, '_ini_weights.h5'))
 
-val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
-                              horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
 earlyStop = EarlyStopping(monitor='val_acc', patience=10)
 start = time.time()
 if VAL_PATH != None:
+    val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
+                                  horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
     if MODEL_TYPE == 'auto1':
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, validation_data=val_generator,
@@ -172,6 +173,15 @@ else:
                                   epochs=N_EPOCHS)
 end =time.time()
 model.save(join(dir_path, name + ".hdf5"))
+time = {'run_time': str(end-start)}
+with open(join(dir_path, '_param.json')) as f:
+    data = json.load(f)
+
+data.update(time)
+
+with open(join(dir_path, '_param.json'), 'w') as f:
+    json.dump(data, f)
+model.save_weights(join(dir_path, '_end_weights.h5'))
 print("Time elapsed: ", str(end - start))
 with open(join(dir_path,'history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
