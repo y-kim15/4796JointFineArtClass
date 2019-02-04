@@ -19,6 +19,7 @@ import tensorflow as tf
 from time import time, sleep
 import pickle
 import json
+import re
 
 import types
 
@@ -81,7 +82,8 @@ VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
-
+# extended implementation of KerasBatchClassifier https://stackoverflow.com/questions/47279677/how-use-grid-search0with0fit0generator-in-keras
+# use of skopt to implement hyperparameter tuning https://scikit-optimize.github.io/notebooks/hyperparameter-optimization.html
 class KerasBatchClassifier(KerasClassifier):
 
     def fit(self, X, y, **kwargs):
@@ -218,7 +220,7 @@ except:
     pass
 
 if train_type == 'empty' or changed:
-    if MODEL_TYPE == 'auto1':
+    if re.search('auto*', MODEL_TYPE):
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='mean_squared_error')
     else:
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
@@ -247,7 +249,7 @@ space = [Real(10**-3, 10**-1, "log-uniform", name='learning_rate'),
 @use_named_args(space)
 def optimise(**params):
     __history = new_model.fit(X=None, y=None, batch_size=BATCH_SIZE, epochs=N_EPOCHS)
-    return __history['val_loss'][-1]
+    return __history['val_acc'][-1]
 
 res_gp = gp_minimize(optimise, space, n_calls=10, n_jobs=-1, random_state=0)
 

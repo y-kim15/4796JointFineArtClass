@@ -25,8 +25,22 @@ N_CLASSES = 25
 
 def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='')
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(input)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
+    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu')(x)
+    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu')(x)
+    encoded = MaxPooling2D((2, 2), strides=(2,2))(x)
 
+    x = Conv2D(128, (3,3), strides=(1,1), activation='relu')(encoded)
+    x = Conv2D(128, (3,3), strides=(1,1), activation='relu')(x)
+    x = UpSampling2D((2,2))(x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
+    x = UpSampling2D((2,2))(x)
+    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+
+    return input, decoded
 # resnet
 def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
@@ -34,7 +48,6 @@ def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     x = Conv2D(64, (7, 7), strides=(2, 2), activation='relu', data_format='channels_last',
                kernel_initializer=VarianceScaling(scale=2.0))(input)
     x = BatchNormalization(axis=3)
-    x = ZeroPadding2D()
     x = MaxPooling2D((3, 3), strides=(2, 2))(x)
     x = Conv2D(64, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
     x = BatchNormalization(axis=3)
@@ -187,7 +200,8 @@ get_model = {
     "test1": get_test1,
     'test2': get_test2,
     'test3': get_test3,
-    "auto1": get_autoencoder1
+    "auto1": get_autoencoder1,
+    'auto2': get_autoencoder2
 }
 
 def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
@@ -195,7 +209,7 @@ def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
     base_model, output = get_model[model_type](input_shape, reg, alpha, drop, pretrained)
     if re.search('test*', model_type):
         model = Model(inputs=base_model.input, outputs=base_model.output)
-    elif model_type == 'auto1':
+    elif re.search('auto*', model_type):
         data_type = False
         model = Model(base_model, output)
     elif model_type == 'vgg16':
@@ -245,7 +259,7 @@ def save_summary(dir_path, name, model):
 def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
     if function == 'vgg16' or function == 'resnet50':
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
-    elif function == 'auto1':
+    elif re.search('auto*', function):
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_id_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)

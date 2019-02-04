@@ -12,6 +12,7 @@ from processing.train_utils import get_model_name, get_new_model, save_summary, 
 from processing.clean_csv import create_dir
 from processing.read_images import count_files
 from keras import backend as K
+import re
 
 config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allocator_type = 'BFC'
@@ -27,7 +28,7 @@ parser = argparse.ArgumentParser(description='Description')
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
 parser.add_argument('--new_m', action="store", default='N', dest='new_path', help='Save in a new directory [Y|N]')
-parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|vgg16|inceptionv3|resnet50]')
+parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|auto2|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
@@ -128,7 +129,7 @@ except:
     pass
 
 if train_type == 'empty' or changed:
-    if MODEL_TYPE == 'auto1':
+    if re.search('auto*', MODEL_TYPE):
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='mean_squared_error')
     else:
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
@@ -148,7 +149,7 @@ start = time.time()
 if VAL_PATH != None:
     val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                                   horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
-    if MODEL_TYPE == 'auto1':
+    if re.search('auto*', MODEL_TYPE):
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, validation_data=val_generator,
                                       validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
