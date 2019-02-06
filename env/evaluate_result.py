@@ -1,10 +1,8 @@
 from keras.models import load_model, Model
 from keras.preprocessing.image import load_img, img_to_array
-from keras.utils import to_categorical
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_curve, auc, classification_report
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from matplotlib.colors import ListedColormap
 import seaborn as sns
 from keras import metrics
 from progressbar import ProgressBar
@@ -17,13 +15,13 @@ from bokeh.plotting import figure, show, output_file
 import pandas as pd
 import argparse
 from processing.clean_csv import create_dir
-from sklearn.preprocessing import label_binarize
 import os
 import pickle
 import itertools
 
 
-MODEL_PATH = "models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
+MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-1-s-1/09-0.416.hdf5"
+    #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
 IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
@@ -38,7 +36,6 @@ parser.add_argument('-d', action="store", dest="data_path",
                     default="data/wikipaintings_small/wikipaintings_test", help="Path of test data")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
-parser.add_argument('-pr', action="store_true", dest='get_pr', default=False, help='Get Precision Recall Curve')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
                     help='Get Classification Report')
 parser.add_argument('-show', action="store_true", dest='show_g', default=False, help='Display graphs')
@@ -213,62 +210,6 @@ def get_pred(model_path, image_path, top_k=1):
     return preds, pcts
 
 
-def get_precision_recall(y_true, y_pred, name, display_all=False):
-    values = []
-    classes = list(range(N_CLASSES))
-    print("classes ", classes)
-    '''
-    for i in range(len(y_true)):
-        print("i: ", i)
-        print(y_true)
-        enc = label_binarize(y_true[i], classes=classes)
-        print(enc)
-        t_bin.append(enc)
-    '''
-    t_bin = to_categorical(y_true)
-    p_bin = to_categorical(y_pred)
-    print(t_bin[0], y_pred[0])
-    for (t, p) in zip(t_bin, p_bin):
-        precision, recall, _ = precision_recall_curve(t.ravel(), p.ravel())
-        values.append((precision, recall))
-    all_true = np.concatenate(t_bin)
-    all_pred = np.concatenate(p_bin)
-    all_precision, all_recall, _ = precision_recall_curve(all_true.ravel(), all_pred.ravel())
-    area = round(auc(all_recall, all_precision), 2)
-    if not display_all:
-        x = np.linspace(0.1, 5, 80)
-
-        p = figure(title='Precision & Recall for ' + name, y_axis_type=float,
-                   x_range=(0.0, max(all_recall) + 1.0), y_range=(0.0, max(all_precision) + 1.0),
-                   background_fill_color="#fafafa")
-
-        p.line(all_recall, all_precision, legend='Overall AUC %.4f' % (round(auc(all_recall, all_precision, 2))),
-               line_color="tomato", line_dash="dashed")
-        p.legend.location = "top_left"
-        file_name = 'pr_curve_' + name
-        output_file(file_name + ".html", title=file_name)
-        show(p)
-
-    return area
-
-    '''old: show pr curve 
-    showPRCurve(values, allPrecision, allRecall, type, name, path, show):
-    plt.figure(figsize=[6, 4.5])
-    for i, (precision, recall) in enumerate(values):
-        label = 'Fold %d AUC %.4f' % (i + 1, auc(recall, precision))
-        plt.step(recall, precision, label=label)
-    label = 'Overall AUC %.4f' % (auc(allRecall, allPrecision))
-    plt.step(allRecall, allPrecision, label=label, lw=2, color='black')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('{0} - PR Curve'.format(name))
-    plt.legend(loc='lower left', fontsize='small')
-    plt.savefig(path + '/' + type + '_prc_' + name + '.svg', format = "svg")
-    if show:
-        plt.show()
-    '''
-
-
 def get_classification_report(y_true, y_pred, labels, name, title, show=True, save=False, **kwargs):
     ddl_heat = ['#DBDBDB', '#DCD5CC', '#DCCEBE', '#DDC8AF', '#DEC2A0', '#DEBB91',
                 '#DFB583', '#DFAE74', '#E0A865', '#E1A256', '#E19B48', '#E29539']
@@ -390,127 +331,59 @@ def plot_history_hover(history, type, add_title=True, show_up=True, save=False, 
     if show_up:
         show(p)
 
-
-def plot_his(history):
-    loss_list = history['loss']
-    val_loss_list = history['val_loss']
-    acc_list = history['acc']
-    val_acc_list = history['val_acc']
-    if len(loss_list) == 0:
-        print('Loss is missing in history')
-        return
-        ## As loss always exists
-    epochs = list(range(1, len(loss_list) + 1))
-    plt.subplots(figsize=(17, 10))
-    sns.set_style('darkgrid')
-    data = {'Epochs': epochs*2, 'Type': list(itertools.chain.from_iterable(itertools.repeat(x, len(epochs)) for x in ['train', 'val'])),
-            'Loss': loss_list + val_loss_list, 'Metric':['Loss']*len(epochs)*2}
-    df = pd.DataFrame(data)
-    sns.lineplot(x='Epochs', y='Loss', hue='Type', data=df)
-    plt.show()
-
-    plt.subplots(figsize=(17,10))
-    sns.set()
-    data2 = {'Epochs': epochs * 2,
-            'Type': list(itertools.chain.from_iterable(itertools.repeat(x, len(epochs)) for x in ['train', 'val'])),
-            'Accuracy':  acc_list + val_acc_list, 'Metric': list(
-            itertools.chain.from_iterable(itertools.repeat(x, len(epochs*2)) for x in ['Accuracy']))}
-    df2 = pd.DataFrame(data2)
-    sns.lineplot(x='Epochs', y='Accuracy', hue='Type', data=df2)
-    #g = sns.FacetGrid(df, col='Metric', hue='Type', sharey=False)
-    #g.map(sns.lineplot, 'Epochs', 'Value')
-
-    plt.show()
-
-
-def plot_history(history):
-    loss_list = history['loss']
-    val_loss_list = history['val_loss']
-    acc_list = history['acc']
-    val_acc_list = history['val_acc']
-
-    if len(loss_list) == 0:
-        print('Loss is missing in history')
-        return
-        ## As loss always exists
-    epochs = range(1, len(loss_list) + 1)
-
-    ## Loss
-    plt.figure(1)
-    plt.plot(epochs, loss_list, 'b',
-             label='Training loss (' + str(str(format(loss_list[-1], '.5f')) + ')'))
-    plt.plot(epochs, val_loss_list, 'g',
-             label='Validation loss (' + str(str(format(val_loss_list[-1], '.5f')) + ')'))
-
-    plt.title('Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-
-    ## Accuracy
-    plt.figure(2)
-    plt.plot(epochs, acc_list, 'b', label='Training accuracy (' + str(format(acc_list[-1], '.5f')) + ')')
-    plt.plot(epochs, val_acc_list, 'g', label='Validation accuracy (' + str(format(val_acc_list[-1], '.5f')) + ')')
-
-    plt.title('Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.show()
-
-def plot_history_plotly(history):
-    import plotly.plotly as py
+#https://plot.ly/python/line-charts/
+def plot_history_plotly(history, type, save=False, **kwargs):
+    import plotly
     import plotly.graph_objs as go
+    if type == 'Loss':
+        d1 = history['loss']
+        d2 = history['val_loss']
+    else:
+        d1 = history['acc']
+        d2 = history['val_acc']
 
-    loss_list = history['loss']
-    val_loss_list = history['val_loss']
-    acc_list = history['acc']
-    val_acc_list = history['val_acc']
-
-    if len(loss_list) == 0:
+    if type == 'Loss' and len(d1) == 0:
         print('Loss is missing in history')
         return
         ## As loss always exists
-    epochs = range(1, len(loss_list) + 1)
-
-    # Add data
-    month = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-             'August', 'September', 'October', 'November', 'December']
-    high_2000 = [32.5, 37.6, 49.9, 53.0, 69.1, 75.4, 76.5, 76.6, 70.7, 60.6, 45.1, 29.3]
-    low_2000 = [13.8, 22.3, 32.5, 37.2, 49.9, 56.1, 57.7, 58.3, 51.2, 42.8, 31.6, 15.9]
-    high_2007 = [36.5, 26.6, 43.6, 52.3, 71.5, 81.4, 80.5, 82.2, 76.0, 67.3, 46.1, 35.0]
-    low_2007 = [23.6, 14.0, 27.0, 36.8, 47.6, 57.7, 58.9, 61.2, 53.3, 48.5, 31.0, 23.6]
-    high_2014 = [28.8, 28.5, 37.0, 56.8, 69.7, 79.7, 78.5, 77.8, 74.1, 62.6, 45.3, 39.9]
-    low_2014 = [12.7, 14.3, 18.6, 35.5, 49.9, 58.0, 60.0, 58.6, 51.7, 45.2, 32.2, 29.1]
+    epochs = list(range(1, len(d1) + 1))
 
     # Create and style traces
     trace0 = go.Scatter(
         x=epochs,
-        y=loss_list,
-        name='Train Loss',
+        y=d1,
+        name='Train ' + type,
         line=dict(
-            color=('rgb(205, 12, 24)'),
-            width=4)
+            color='#440154', width=4)
     )
+    # '#440154', '#404387', '#29788E', '#22A784', '#79D151', '#FDE724
     trace1 = go.Scatter(
         x=epochs,
-        y=val_loss_list,
-        name='Val Loss',
+        y=d2,
+        name='Val ' + type,
         line=dict(
-            color=('rgb(22, 96, 167)'),
-            width=4, )
+            color='#ff8080', width=4)
     )
 
     data = [trace0, trace1]
 
     # Edit the layout
-    layout = dict(title='Average High and Low Temperatures in New York',
+    layout = dict(title='Training History Plot',
                   xaxis=dict(title='Epochs'),
-                  yaxis=dict(title='Loss'),
+                  yaxis=dict(title=type),
                   )
 
     fig = dict(data=data, layout=layout)
-    py.iplot(fig, filename='styled-line')
+
+    if save:
+        if 'path' in kwargs:
+            path = kwargs['path']
+        if 'name' in kwargs:
+            name = kwargs['name']
+        plotly.offline.plot(fig, filename=join(path, name+'.html'), auto_open=False)
+        print(join(path, name + '.html'))
+        print("saved")
+
 
 def decode_image_autoencoder(model_path, img_path):
     autoencoder = load_model(model_path)
@@ -564,17 +437,17 @@ def evaluate():
         classes = get_dico().keys()
         get_classification_report(y_true, y_pred, classes, name, 'classification report: ' + name, show=SHOW, save=SAVE,
                                   path=SAVE_PATH)
-    if args.get_pr:
-        get_precision_recall(y_true, y_pred, name, SHOW)
 
 
 
-get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=156)
-#evaluate()
-#his = pickle.load(open('models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
-#                       '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
+#get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=156)
+evaluate()
+#his = pickle.load(open('models/resnet50_2-4-15-35_empty_layers-3-s-0/history.pck', 'rb'))
+    #'models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
+     #                  '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
 #print(his)
-#plot_history_hover(his, 'Accuracy', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_acc')
+#plot_history_plotly(his, 'Accuracy', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_acc_plotly')
+#plot_history_plotly(his, 'Loss', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_loss_plotly')
 #plot_history_hover(his, 'Loss', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_loss')
     # resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5
     # MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"

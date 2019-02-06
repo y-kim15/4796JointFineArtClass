@@ -16,10 +16,16 @@ from os.path import join
 import math
 from keras.preprocessing.image import load_img, img_to_array
 import re
+import sys
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
 N_CLASSES = 25
+
+def fixed_generator(generator):
+    for batch in generator:
+        yield (batch, batch)
+
 # Code influenced by keras application examples
 # that from rasta and from ...
 
@@ -38,7 +44,7 @@ def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
     x = UpSampling2D((2,2))(x)
-    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+    decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
 
     return input, decoded
 # resnet
@@ -148,15 +154,15 @@ def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
     else:
         base_model = VGG16(include_top=False, weights='imagenet', input_shape=input_shape)
 
-    x = Sequential()
-    x.add(Flatten(input_shape=base_model.output_shape[1:]))
-    x.add(Dense(56, activation='relu'))
+    x = base_model.output
+    x = GlobalAveragePooling2D(data_format='channels_last')(x)
+    # added below
+    x = Dense(128, activation='relu')(x)  # , kernel_regularizer=add_reg(alpha))(x)
     if dropout > 0:
-        x.add(Dropout(dropout))
-    #x.add(Dense(512, activation='relu'))
-    #x.add(Dropout(0.5))
-    x.add(Dense(N_CLASSES, activation='softmax'))
-    return base_model, x
+        x = Dropout(dropout)(x)
+    # up to above
+    output = Dense(N_CLASSES, activation='softmax')(x)
+    return base_model, output
 
 
 def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
@@ -212,24 +218,95 @@ def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
     elif re.search('auto*', model_type):
         data_type = False
         model = Model(base_model, output)
-    elif model_type == 'vgg16':
-        model = Model(inputs=base_model.input, outputs=output(base_model.output))
     else:
         model = Model(inputs=base_model.input, outputs=output)
     return model, data_type
 
-def copy_weights(old_model, new_model, layer_no):
-    i = 0
-    j = layer_no
-    if layer_no > 0:
-        j = len(old_model.layers) - layer_no
-    for layer in old_model.layers:
-        if i == j:
-            break
-        new_model.layers[i].set_weights(old_model.layers[i].get_weights())
-        i += 1
+def copy_weights(old_model, new_model, replace_type, layer_no):
+    if replace_type == 'range':
+        if '-' not in layer_no:
+            return None
+        else:
+            try:
+                start = int(layer_no.split('-')[0])
+                end = int(layer_no.split('-')[1])
+                for i in range(start, end+1):
+                    new_model.layers[i].set_weights(old_model.layers[i].get_weights())
+            except ValueError:
+                return None
+    elif replace_type == 'end':
+        try:
+            index = int(layer_no)
+            for i in range(index, len(new_model.layers)):
+                new_model.layers[i].set_weights(old_model.layers[i].get_weights())
+        except ValueError:
+            return None
+    else:
+        # layer
+        if layer_no.isdigit():
+            if int(layer_no) > 0:
+                index = int(layer_no)
+                if index >= len(new_model.layers):
+                    return None
+                else:
+                    new_model.layers[index].set_weights(old_model.layers[index].get_weights())
     return new_model
 
+def set_trainable_layers(model, layers):
+    changed = False
+    if '-' not in layers:
+        try:
+            v = int(layers)
+            if v > 0 and v <= 10:
+                for layer in model.layers[:len(model.layers) - v]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+                for layer in model.layers[len(model.layers) - v:]:
+                    if layer.trainable == False:
+                        changed = True
+                    layer.trainable = True
+            elif v == 0:
+                for layer in model.layers:
+                    if layer.trainable == False:
+                        changed = True
+                    layer.trainable = True
+            else:
+                if model.layers[v].trainable == False:
+                    changed = True
+                model.layers[v].trainable = True
+                for layer in model.layers[:v]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+                for layer in model.layers[v+1:]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+
+        except ValueError:
+            sys.exit("Error in input of the number of trainable layers")
+    else:
+        try:
+            start = int(layers.split('-')[0])
+            end = int(layers.split('-')[1])
+            if start >= len(model.layers) or end >= len(model.layers) or start < 0 or end < 0 or start >= end:
+                raise ValueError
+            for layer in model.layers[start:end+1]:
+                if layer.trainable == False:
+                    changed = True
+                layer.trainable = True
+            for layer in model.layers[0:start]:
+                if layer.trainable == True:
+                    changed = True
+                layer.trainable = False
+            for layer in model.layers[end+1:]:
+                if layer.trainable == True:
+                    changed = True
+                layer.trainable = False
+        except ValueError:
+            sys.exit("Error in input of the number of trainable layers")
+    return model, changed
 def get_model_name(sample_no, type='empty', model_type='test1', n_tune=0, **kwargs):
     if type == 'empty':
         now = datetime.datetime.now()
