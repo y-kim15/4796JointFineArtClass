@@ -47,6 +47,7 @@ parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_
 parser.add_argument('--rep', action="store_true", default=False, dest='replace_type', help='Replace layers [range|end|one]')
 parser.add_argument('-ln', action="store", dest='layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
 parser.add_argument('-tr', action="store_true", default=False, dest='pretrained', help="Get pretrained model")
+parser.add_argument('-path', aciton="store", default="", dest='path')
 
 args = parser.parse_args()
 print("Args: ", args)
@@ -112,7 +113,10 @@ else:
     MODEL_PATH = None
     model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=args.pretrained)
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, n_tune=N_TUNE)
-    dir_path = join("models", name)
+    if args.path != "":
+        dir_path = join(args.path, name)
+    else:
+        dir_path = join("models", name)
     create_dir(dir_path)
 
 model, changed = set_trainable_layers(model, N_TUNE)
@@ -186,7 +190,8 @@ data.update(time)
 with open(join(dir_path, '_param.json'), 'w') as f:
     json.dump(data, f)
 model.save_weights(join(dir_path, '_end_weights.h5'))
-print("Time elapsed: ", str(end - start))
+print("Train_l,", history['loss'][-1], ",Train_acc", history['acc'][-1] ,"Val_l", history['val_loss'][-1], ",Val_acc,",
+      history['val_acc'][-1], ",Time,", str(end - start))
 with open(join(dir_path,'history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()
