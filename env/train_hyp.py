@@ -17,7 +17,7 @@ create_dir(join(PATH, 'models', name))
 #f.close()
 
 EPOCHS = 5
-BATCH_SIZE = 60
+BATCH_SIZE = 60#60
 dropouts = [0.3, 0.4, 0.5]
 lrs = [0.001, 0.01, 0.1]
 opts = ['adam', 'rmsprop']  # 'adadelta', 'sgd']
@@ -31,10 +31,13 @@ for d in dropouts:
     for opt in opts:
         for lr in lrs:
 
-
             subprocess.call(
                 ["python", "train.py", "--model_type", "resnet50", "-b" , str(BATCH_SIZE) ,"-e", str(EPOCHS), "--opt", opt,
                  "-lr",str(lr),"--dropout",str(d),"-n", "3", "-tr", "-path", FINAL_PATH])
+
             i += 1
 
 print("time elapsed: ", time.time()-start)
+
+# method to get values from created csv file (_output.csv) in FINAL_PATH one giving highest val acc
+# method to call evaluate to get highest test acc

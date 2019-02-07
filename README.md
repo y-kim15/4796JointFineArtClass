@@ -2,9 +2,10 @@
 
 ### To set up the environment
     cd env
-    virtualenv-3.6 .python
-    source .python/bin/activate
-    pip install -r ../requirements.txt
+    virtualenv -p python3 venv
+    source venv/bin/activate
+    pip3 install -r ../requirements.txt
+This will enable using python3.
 Note that this automatically installs tensorflow-gpu for GPU support
 
 ### Train a new model

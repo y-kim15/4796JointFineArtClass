@@ -9,13 +9,13 @@ from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, Learnin
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
 from processing.train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, \
-    get_optimiser, exp_decay, copy_weights, fixed_generator, set_trainable_layers
+    get_optimiser, exp_decay, copy_weights, fixed_generator, set_trainable_layers, merge_two_dicts
 from processing.clean_csv import create_dir
 from processing.read_images import count_files
 from keras import backend as K
 import re
 from collections import Counter
-import sys
+import sys, csv
 
 config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allocator_type = 'BFC'
@@ -76,8 +76,8 @@ else:
     REG = l2
 
 changed = False
-TRAIN_PATH = join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
+TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")##join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")# join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#
 
 INPUT_SHAPE = (224, 224, 3)
 
@@ -115,10 +115,10 @@ else:
     model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=args.pretrained)
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, n_tune=N_TUNE)
     if args.path != "":
-        dir_path = join(args.path, name)
+        dir_path = args.path
     else:
         dir_path = join("models", name)
-    create_dir(dir_path)
+        create_dir(dir_path)
 
 model, changed = set_trainable_layers(model, N_TUNE)
 
@@ -147,12 +147,13 @@ if train_type == 'empty' or changed:
 elif LR != 0.001:
     K.set_value(model.optimizer.lr, LR)
 
-save_summary(dir_path, name, model)
-with open(join(dir_path, '_model.json'), 'w') as json_file:
-    json_file.write(model.to_json())
-with open(join(dir_path, '_param.json'), 'w') as json_file:
-    json.dump(vars(args), json_file)  # json_file.write(vars(args))
-model.save_weights(join(dir_path, '_ini_weights.h5'))
+if args.path == "":
+    save_summary(dir_path, name, model)
+    with open(join(dir_path, '_model.json'), 'w') as json_file:
+        json_file.write(model.to_json())
+    with open(join(dir_path, '_param.json'), 'w') as json_file:
+        json.dump(vars(args), json_file)  # json_file.write(vars(args))
+    model.save_weights(join(dir_path, '_ini_weights.h5'))
 
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
 earlyStop = EarlyStopping(monitor='val_acc', patience=5)
@@ -167,36 +168,49 @@ if VAL_PATH != None:
 
     checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                  verbose=1, save_best_only=True, mode='max')
+    callbacks = [tb, earlyStop]
+    if args.path == "":
+        callbacks.append(checkpoint)
     if not DECAY.isdigit() or DECAY != None:
         if DECAY == 'step':
             lr_decay = LearningRateScheduler(step_decay)
         else:
             lr_decay = LearningRateScheduler(exp_decay)
-        history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                      epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop, lr_decay],
-                                      validation_data=val_generator,
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
-    else:
-        history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                      epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
+        callbacks.append(lr_decay)
+
+    history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
+                                  epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
+                                  validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
 else:
     history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                   epochs=N_EPOCHS, class_weight=WEIGHTS)
 end =time.time()
 model.save(join(dir_path, name + ".hdf5"))
+#ints = 'e_'.join([str(x) for x in list(range(N_EPOCHS))])
 extra = {'train_loss': history.history['loss'][-1],'train_acc':history.history['acc'][-1], 'val_loss':
-    history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'run_time': str(end-start)}
-with open(join(dir_path, '_param.json')) as f:
-    data = json.load(f)
-
-data.update(extra)
-
-with open(join(dir_path, '_param.json'), 'w') as f:
-    json.dump(data, f)
+    history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'e':history.history['val_acc'].index(max(history.history['val_acc'])),
+         'max_val_acc': max(history.history['val_acc']),'run_time': str(end-start)}
+data = merge_two_dicts(vars(args), extra)
 model.save_weights(join(dir_path, '_end_weights.h5'))
-with open(join(dir_path,'history.pck'), 'wb') as f:
-    pickle.dump(history.history, f)
-    f.close()
+if args.path == "":
+    #with open(join(dir_path, '_param.json')) as f:
+    #    data = json.load(f)
+    #data.update(extra)
+    with open(join(dir_path, '_param.json'), 'w') as f:
+        json.dump(data, f)
+
+    with open(join(dir_path, 'history.pck'), 'wb') as f:
+        pickle.dump(history.history, f)
+        f.close()
+else:
+    if not os.path.isfile(join(dir_path, '_output.csv')):
+        head = True
+    else:
+        head = False
+    with open(join(dir_path, '_output.csv'), 'a') as f:
+        w = csv.DictWriter(f, data.keys())
+        if head:
+            w.writeheader()
+        w.writerow(data)
 
 

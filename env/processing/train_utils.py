@@ -478,7 +478,10 @@ def wp_preprocess_input(x):
     x[:, :, 2] -= 104.432
     return x
 
-
+def merge_two_dicts(x, y):
+    z = x.copy()   # start with x's keys and values
+    z.update(y)    # modifies z with y's keys and values & returns None
+    return z
 
 if __name__=='__main__':
     DATA_PATH = 'data/wikipaintings_full/wikipaintings_train/Abstract_Art/ad-reinhardt_collage-1938.jpg'
