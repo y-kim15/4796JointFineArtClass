@@ -20,7 +20,7 @@ import pickle
 import itertools
 
 
-MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-1-s-1/09-0.416.hdf5"
+MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
 IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
 
@@ -425,7 +425,7 @@ def evaluate():
     SHOW = args.show_g
     SAVE = args.save
     if SAVE:
-        SAVE_PATH = args.save_path
+          SAVE_PATH = args.save_path
         #SAVE_PATH = join(args.save_path, name)
         #create_dir(join(SAVE_PATH, name))
     else:

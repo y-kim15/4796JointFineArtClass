@@ -35,7 +35,7 @@ parser.add_argument('--model_type', action='store', default='test1', dest='model
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
-parser.add_argument('-n', action="store", dest='n_layers_trainable',help='Set the number of trainable layers, range [a-b] or single value [x] for last x layers only')
+parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable',help='Set the number of trainable layers, range [a-b] or [csv] or single value [x] for last x layers only')
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 5), metavar='[0-4]', help='Sample Number to use [0-4]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
@@ -47,7 +47,8 @@ parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_
 parser.add_argument('--rep', action="store_true", default=False, dest='replace_type', help='Replace layers [range|end|one]')
 parser.add_argument('-ln', action="store", dest='layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
 parser.add_argument('-tr', action="store_true", default=False, dest='pretrained', help="Get pretrained model")
-parser.add_argument('-path', aciton="store", default="", dest='path')
+parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train hyp case')
+parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanaced data')
 
 args = parser.parse_args()
 print("Args: ", args)
@@ -75,8 +76,8 @@ else:
     REG = l2
 
 changed = False
-TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
+TRAIN_PATH = join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
@@ -125,9 +126,12 @@ params = vars(args)
 
 train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                                 horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
-counter = Counter(train_generator.classes)
-max_val = float(max(counter.values()))
-class_weights = {class_id : max_val/num_images for class_id, num_images in counter.items()}
+WEIGHTS = None
+if args.add_wei:
+   counter = Counter(train_generator.classes)
+   max_val = float(max(counter.values()))
+   class_weights = {class_id: max_val / num_images for class_id, num_images in counter.items()}
+   WEIGHTS = class_weights
 
 try:
     model = multi_gpu_model(model)
@@ -159,7 +163,7 @@ if VAL_PATH != None:
     if re.search('auto*', MODEL_TYPE):
         history = model.fit_generator(fixed_generator(train_generator), steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, validation_data=fixed_generator(val_generator),
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=class_weights)
+                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
 
     checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
                                  verbose=1, save_best_only=True, mode='max')
@@ -171,27 +175,26 @@ if VAL_PATH != None:
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop, lr_decay],
                                       validation_data=val_generator,
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=class_weights)
+                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
     else:
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                       epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=class_weights)
+                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
 else:
     history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                  epochs=N_EPOCHS, class_weight=class_weights)
+                                  epochs=N_EPOCHS, class_weight=WEIGHTS)
 end =time.time()
 model.save(join(dir_path, name + ".hdf5"))
-time = {'run_time': str(end-start)}
+extra = {'train_loss': history.history['loss'][-1],'train_acc':history.history['acc'][-1], 'val_loss':
+    history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'run_time': str(end-start)}
 with open(join(dir_path, '_param.json')) as f:
     data = json.load(f)
 
-data.update(time)
+data.update(extra)
 
 with open(join(dir_path, '_param.json'), 'w') as f:
     json.dump(data, f)
 model.save_weights(join(dir_path, '_end_weights.h5'))
-print("Train_l,", history['loss'][-1], ",Train_acc", history['acc'][-1] ,"Val_l", history['val_loss'][-1], ",Val_acc,",
-      history['val_acc'][-1], ",Time,", str(end - start))
 with open(join(dir_path,'history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()

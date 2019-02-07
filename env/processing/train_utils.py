@@ -30,19 +30,39 @@ def fixed_generator(generator):
 # that from rasta and from ...
 
 def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
-    input = Input(shape=input_shape)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(input)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
-    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu')(x)
-    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu')(x)
-    encoded = MaxPooling2D((2, 2), strides=(2,2))(x)
+    '''
+    input = Input(shape=(28, 28, 1))  # adapt this if using `channels_first` image data format
 
-    x = Conv2D(128, (3,3), strides=(1,1), activation='relu')(encoded)
-    x = Conv2D(128, (3,3), strides=(1,1), activation='relu')(x)
-    x = UpSampling2D((2,2))(x)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu')(x)
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(input)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    encoded = MaxPooling2D((2, 2), padding='same')(x)
+
+    # at this point the representation is (4, 4, 8) i.e. 128-dimensional
+
+    x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(16, (3, 3), activation='relu')(x)
+    x = UpSampling2D((2, 2))(x)
+    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+    '''
+    input = Input(shape=input_shape)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(input)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = MaxPooling2D((2,2), padding='same')(x)
+   # x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    encoded = MaxPooling2D((2, 2), padding='same')(x)
+
+    #x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(encoded)
+    #x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(x)
+    #x = UpSampling2D((2,2))(x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding = 'same')(encoded)#x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding = 'same')(x)
     x = UpSampling2D((2,2))(x)
     decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
 
@@ -256,34 +276,52 @@ def set_trainable_layers(model, layers):
     changed = False
     if '-' not in layers:
         try:
-            v = int(layers)
-            if v > 0 and v <= 10:
-                for layer in model.layers[:len(model.layers) - v]:
-                    if layer.trainable == True:
+            if ',' not in layers:
+                v = int(layers)
+                if v > 0 and v <= 10:
+                    for layer in model.layers[:len(model.layers) - v]:
+                        if layer.trainable == True:
+                            changed = True
+                        layer.trainable = False
+                    for layer in model.layers[len(model.layers) - v:]:
+                        if layer.trainable == False:
+                            changed = True
+                        layer.trainable = True
+                elif v == 0:
+                    for layer in model.layers:
+                        if layer.trainable == False:
+                            changed = True
+                        layer.trainable = True
+                else:
+                    if model.layers[v].trainable == False:
                         changed = True
-                    layer.trainable = False
-                for layer in model.layers[len(model.layers) - v:]:
-                    if layer.trainable == False:
-                        changed = True
-                    layer.trainable = True
-            elif v == 0:
-                for layer in model.layers:
-                    if layer.trainable == False:
-                        changed = True
-                    layer.trainable = True
+                    model.layers[v].trainable = True
+                    for layer in model.layers[:v]:
+                        if layer.trainable == True:
+                            changed = True
+                        layer.trainable = False
+                    for layer in model.layers[v + 1:]:
+                        if layer.trainable == True:
+                            changed = True
+                        layer.trainable = False
             else:
-                if model.layers[v].trainable == False:
-                    changed = True
-                model.layers[v].trainable = True
-                for layer in model.layers[:v]:
-                    if layer.trainable == True:
-                        changed = True
-                    layer.trainable = False
-                for layer in model.layers[v+1:]:
-                    if layer.trainable == True:
-                        changed = True
-                    layer.trainable = False
-
+                ls = layers.split(',')
+                for n, i in zip(range(len(ls)), ls):
+                    ii = int(i)
+                    if n == 0:
+                        for layer in model.layers[:ii]:
+                            if layer.trainable == True:
+                                changed = True
+                            layer.trainable = False
+                    elif n == len(ls)-1:
+                        for layer in model.layers[ii+1:]:
+                            if layer.trainable == True:
+                                changed = True
+                            layer.trainable = False
+                    else:
+                        if model.layers[ii].trainable == False:
+                            changed = True
+                        model.layers[ii].trainable = True
         except ValueError:
             sys.exit("Error in input of the number of trainable layers")
     else:
@@ -355,7 +393,7 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
             batch_size=batch_size,
             seed=0,
             class_mode=None)
-
+    print("total size : ", generator.n)
     return generator
 
 
@@ -422,10 +460,12 @@ def scale_preprocess_input(x):
 
 # zero-center by mean pixel calculated for id_medium_train
 def scale_id_preprocess_input(x):
+    # 'RGB'->'BGR'
+    x = x[:, :, ::-1]
     x[:, :, 0] -= 115.247
     x[:, :, 1] -= 104.962
     x[:, :, 2] -= 91.913
-    x *= 1./255
+    #x *= 1./255
     return x
 
 
