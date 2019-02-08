@@ -158,29 +158,36 @@ if args.path == "":
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
 earlyStop = EarlyStopping(monitor='val_acc', patience=5)
 start = time.time()
+add = ""
 if VAL_PATH != None:
     val_generator = get_generator(VAL_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                                   horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
     if re.search('auto*', MODEL_TYPE):
+        checkpoint = ModelCheckpoint(join(dir_path, add+"{epoch:02d}-{val_loss:.3f}.hdf5"), monitor='val_loss',
+                                     verbose=1, save_best_only=True, mode='min')
         history = model.fit_generator(fixed_generator(train_generator), steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                      epochs=N_EPOCHS, validation_data=fixed_generator(val_generator),
+                                      epochs=N_EPOCHS, callbacks=[checkpoint], validation_data=fixed_generator(val_generator),
                                       validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
 
-    checkpoint = ModelCheckpoint(join(dir_path, "{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
-                                 verbose=1, save_best_only=True, mode='max')
-    callbacks = [tb, earlyStop]
-    if args.path == "":
-        callbacks.append(checkpoint)
-    if not DECAY.isdigit() or DECAY != None:
-        if DECAY == 'step':
-            lr_decay = LearningRateScheduler(step_decay)
-        else:
-            lr_decay = LearningRateScheduler(exp_decay)
-        callbacks.append(lr_decay)
+    else:
+        if args.path != "":
+            add = name + "-"
+        checkpoint = ModelCheckpoint(join(dir_path, add+"{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
+                                     verbose=1, save_best_only=True, mode='max')
+        callbacks = [tb, earlyStop]
+        if args.path == "":
+            callbacks.append(checkpoint)
+        if not DECAY.isdigit() or DECAY != None:
+            if DECAY == 'step':
+                lr_decay = LearningRateScheduler(step_decay)
+            else:
+                lr_decay = LearningRateScheduler(exp_decay)
+            callbacks.append(lr_decay)
 
-    history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                  epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop], validation_data=val_generator,
-                                  validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
+        history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
+                                      epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop],
+                                      validation_data=val_generator,
+                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
 else:
     history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
                                   epochs=N_EPOCHS, class_weight=WEIGHTS)
@@ -191,7 +198,7 @@ extra = {'train_loss': history.history['loss'][-1],'train_acc':history.history['
     history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'e':history.history['val_acc'].index(max(history.history['val_acc'])),
          'max_val_acc': max(history.history['val_acc']),'run_time': str(end-start)}
 data = merge_two_dicts(vars(args), extra)
-model.save_weights(join(dir_path, '_end_weights.h5'))
+model.save_weights(join(dir_path, add+'_end_weights.h5'))
 if args.path == "":
     #with open(join(dir_path, '_param.json')) as f:
     #    data = json.load(f)
