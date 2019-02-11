@@ -9,7 +9,7 @@ from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, Learnin
 from keras.regularizers import l1, l2
 from keras.utils import multi_gpu_model
 from processing.train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, \
-    get_optimiser, exp_decay, copy_weights, fixed_generator, set_trainable_layers, merge_two_dicts
+    get_optimiser, exp_decay, copy_weights, fixed_generator, set_trainable_layers, merge_two_dicts, lr_decay_callback,lr_decay_callback2
 from processing.clean_csv import create_dir
 from processing.read_images import count_files
 from keras import backend as K
@@ -39,7 +39,7 @@ parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable'
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 5), metavar='[0-4]', help='Sample Number to use [0-4]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
-parser.add_argument('--decay', action="store", default='none', dest='add_decay', choices=['none', 'rate', 'step', 'rate', 'dec'], help='Add decay to Learning Rate for Optimiser')
+parser.add_argument('--decay', action="store", default='none', dest='add_decay', choices=['none', 'rate', 'step', 'exp', 'dec'], help='Add decay to Learning Rate for Optimiser')
 parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
 parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
@@ -156,7 +156,7 @@ if args.path == "":
     model.save_weights(join(dir_path, '_ini_weights.h5'))
 
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
-earlyStop = EarlyStopping(monitor='val_acc', patience=5)
+earlyStop = EarlyStopping(monitor='val_acc', patience=3)
 start = time.time()
 add = ""
 if VAL_PATH != None:
@@ -166,8 +166,7 @@ if VAL_PATH != None:
         checkpoint = ModelCheckpoint(join(dir_path, add+"{epoch:02d}-{val_loss:.3f}.hdf5"), monitor='val_loss',
                                      verbose=1, save_best_only=True, mode='min')
         history = model.fit_generator(fixed_generator(train_generator), steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                      epochs=N_EPOCHS, callbacks=[checkpoint], validation_data=fixed_generator(val_generator),
-                                      validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
+                                      epochs=N_EPOCHS, callbacks=[checkpoint], validation_data=fixed_generator(val_generator), validation_steps=count_files(VAL_PATH) // BATCH_SIZE)
 
     else:
         if args.path != "":
@@ -177,15 +176,19 @@ if VAL_PATH != None:
         callbacks = [tb, earlyStop]
         if args.path == "":
             callbacks.append(checkpoint)
-        if not DECAY.isdigit() or DECAY != None:
+        if not DECAY.isdigit() or DECAY != None or DECAY != 'rate':
             if DECAY == 'step':
-                lr_decay = LearningRateScheduler(step_decay)
+                decay_rate = 0.5
+                lr_decay = lr_decay_callback(LR, decay_rate)
+                #lr_decay = LearningRateScheduler(step_decay)
             else:
-                lr_decay = LearningRateScheduler(exp_decay)
+                decay_rate = 0.1
+                lr_decay = lr_decay_callback2(LR, decay_rate)
+                #lr_decay = LearningRateScheduler(exp_decay)
             callbacks.append(lr_decay)
 
         history = model.fit_generator(train_generator, steps_per_epoch=count_files(TRAIN_PATH) // BATCH_SIZE,
-                                      epochs=N_EPOCHS, callbacks=[tb, checkpoint, earlyStop],
+                                      epochs=N_EPOCHS, callbacks=callbacks,
                                       validation_data=val_generator,
                                       validation_steps=count_files(VAL_PATH) // BATCH_SIZE, class_weight=WEIGHTS)
 else:
@@ -197,24 +200,25 @@ model.save(join(dir_path, name + ".hdf5"))
 extra = {'train_loss': history.history['loss'][-1],'train_acc':history.history['acc'][-1], 'val_loss':
     history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'e':history.history['val_acc'].index(max(history.history['val_acc'])),
          'max_val_acc': max(history.history['val_acc']),'run_time': str(end-start)}
-data = merge_two_dicts(vars(args), extra)
-model.save_weights(join(dir_path, add+'_end_weights.h5'))
+orig = vars(args)
+orig['path'] = dir_path + '/' + name
+data = merge_two_dicts(orig, extra)
+with open(join(dir_path, add + '_history.pck'), 'wb') as f:
+    pickle.dump(history.history, f)
+    f.close()
 if args.path == "":
+    model.save_weights(join(dir_path, add + '_end_weights.h5'))
     #with open(join(dir_path, '_param.json')) as f:
     #    data = json.load(f)
     #data.update(extra)
     with open(join(dir_path, '_param.json'), 'w') as f:
         json.dump(data, f)
-
-    with open(join(dir_path, 'history.pck'), 'wb') as f:
-        pickle.dump(history.history, f)
-        f.close()
 else:
     if not os.path.isfile(join(dir_path, '_output.csv')):
         head = True
     else:
         head = False
-    with open(join(dir_path, '_output.csv'), 'a') as f:
+    with open(join(dir_path, '_output.csv'), 'a', newline='') as f:
         w = csv.DictWriter(f, data.keys())
         if head:
             w.writeheader()

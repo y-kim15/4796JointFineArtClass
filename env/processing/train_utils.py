@@ -15,6 +15,7 @@ import os
 from os.path import join
 import math
 from keras.preprocessing.image import load_img, img_to_array
+from keras.callbacks import LearningRateScheduler
 import re
 import sys
 
@@ -25,7 +26,7 @@ N_CLASSES = 25
 def fixed_generator(generator):
     for batch in generator:
         yield (batch, batch)
-
+        #yield batch
 # Code influenced by keras application examples
 # that from rasta and from ...
 
@@ -237,7 +238,7 @@ def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
         model = Model(inputs=base_model.input, outputs=base_model.output)
     elif re.search('auto*', model_type):
         data_type = False
-        model = Model(base_model, output)
+        model = Model(inputs=base_model, outputs=output)
     else:
         model = Model(inputs=base_model.input, outputs=output)
     return model, data_type
@@ -375,7 +376,7 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
     if function == 'vgg16' or function == 'resnet50':
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
     elif re.search('auto*', function):
-        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_id_preprocess_input)
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=id_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
 
@@ -392,12 +393,25 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
             target_size=target_size,
             batch_size=batch_size,
             seed=0,
-            class_mode=None)
+            class_mode='input')
     print("total size : ", generator.n)
     return generator
 
 
 # learning rate schedule
+def lr_decay_callback(lr_init, lr_decay):
+    def step_decay(epoch):
+        drop = 5
+        return lr_init * math.pow(lr_decay, math.floor((1 + epoch) / drop))
+        #return lr_init * math.pow(lr_decay, (epoch + 1))
+    return LearningRateScheduler(step_decay)
+
+
+def lr_decay_callback2(lr_init, lr_decay):
+    def exp_decay(epoch):
+        return lr_init * math.exp(-lr_decay * epoch)
+    return LearningRateScheduler(exp_decay)
+
 def step_decay(epoch):
     initial_lrate = 0.1
     drop = 0.5
@@ -459,7 +473,7 @@ def scale_preprocess_input(x):
     return x
 
 # zero-center by mean pixel calculated for id_medium_train
-def scale_id_preprocess_input(x):
+def id_preprocess_input(x):
     # 'RGB'->'BGR'
     x = x[:, :, ::-1]
     x[:, :, 0] -= 115.247

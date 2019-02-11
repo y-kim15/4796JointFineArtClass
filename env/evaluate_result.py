@@ -6,7 +6,7 @@ from matplotlib import colors
 import seaborn as sns
 from keras import metrics
 from progressbar import ProgressBar
-from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input, scale_id_preprocess_input
+from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input, id_preprocess_input
 from processing.read_images import count_files
 from os import listdir
 from os.path import join
@@ -22,7 +22,7 @@ import itertools
 
 MODEL_PATH = "models/auto2_2-8-11-5_empty_layers-0-s-0/03-5931.456.hdf5"#"models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/adriaen-brouwer_village-barbershop.jpg"
+IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_pieta-1600.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
 DEFAULT_SAVE_PATH = "models/eval"
@@ -384,20 +384,29 @@ def plot_history_plotly(history, type, save=False, **kwargs):
         print(join(path, name + '.html'))
         print("saved")
 
+def show_image(img_path):
+    img = load_img(img_path)
+    x = img_to_array(img)
+    plt.imshow(x/255.)
+    plt.title('Original image')
+    plt.show()
 
 def decode_image_autoencoder(model_path, img_path, target_size):
     autoencoder = load_model(model_path)
     img = load_img(img_path, target_size=target_size)
     x = img_to_array(img)
-    x = scale_id_preprocess_input(x)
-    x = x[np.newaxis,:,:,:]
-    dec = autoencoder.predict(x)  # Decoded image
-    x = x[0]
-    dec = dec[0]
+    orig = np.array(x, copy=True)
+    y = id_preprocess_input(x)
+    y = y[np.newaxis,:,:,:]
+    #orig = orig[np.newaxis,:,:,:]
+    dec = autoencoder.predict(y)  # Decoded image
+    orig = orig/255.
+    dec = dec[0][:, :, ::-1]
+    dec = dec/255.
     #x = (x.transpose((1, 2, 0)) ).astype('uint8') #removed *255 inside as.type lhs
     #dec = (dec.transpose((1, 2, 0)) ).astype('uint8')
 
-    plt.imshow(np.hstack((x, dec)))
+    plt.imshow(np.hstack((orig, dec)))
     plt.title('Original and reconstructed images')
     plt.show()
 
@@ -441,9 +450,10 @@ def evaluate():
                                   path=SAVE_PATH)
 
 
-decode_image_autoencoder(MODEL_PATH, IMG_PATH, (224,224))
+#show_image(IMG_PATH)
+#decode_image_autoencoder(MODEL_PATH, IMG_PATH, (224,224))
 #get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=156)
-#evaluate()
+evaluate()
 #his = pickle.load(open('models/resnet50_2-4-15-35_empty_layers-3-s-0/history.pck', 'rb'))
     #'models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
      #                  '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
