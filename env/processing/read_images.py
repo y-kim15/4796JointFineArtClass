@@ -2,7 +2,7 @@ import os
 import re
 import pandas
 import csv
-from processing.clean_csv import Clean
+from processing.clean_csv import Clean, create_dir
 import imageio
 import math
 import random
@@ -112,7 +112,7 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
         for i in range(n_dest):
             dir_name = "small_" + d_type
             to_path = join(target_path + str(i), dir_name)
-            Clean.create_dir(to_path)
+            create_dir(to_path)
         get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
 
 

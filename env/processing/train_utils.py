@@ -196,7 +196,11 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     # let's add a fully-connected layer
-    x = Dense(512, activation='relu')(x)
+    # added below
+    x = Dense(128, activation='relu')(x)  # , kernel_regularizer=add_reg(alpha))(x)
+    if dropout > 0:
+        x = Dropout(dropout)(x)
+    # up to above
     # and a logistic layer -- let's say we have 200 classes
     output = Dense(N_CLASSES, activation='softmax')(x)
 
@@ -346,11 +350,15 @@ def set_trainable_layers(model, layers):
         except ValueError:
             sys.exit("Error in input of the number of trainable layers")
     return model, changed
-def get_model_name(sample_no, type='empty', model_type='test1', n_tune=0, **kwargs):
+
+def get_model_name(sample_no, type='empty', multi=False, model_type='resnet50', n_tune=0, **kwargs):
     if type == 'empty':
-        now = datetime.datetime.now()
-        name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
-        name = name + "_empty"
+        if not multi:
+            now = datetime.datetime.now()
+            name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
+            name = name + "_empty"
+        else:
+            kwargs["    "]
     else:
         name = kwargs["name"].rsplit("_", 1)[0] + '_' + type  # just get model_type_time form
     if n_tune == 0:

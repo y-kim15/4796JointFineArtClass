@@ -19,10 +19,10 @@ import os
 import pickle
 import itertools
 
-
-MODEL_PATH = "models/auto2_2-8-11-5_empty_layers-0-s-0/03-5931.456.hdf5"#"models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
+#"models/auto2_2-8-11-5_empty_layers-0-s-0/03-5931.456.hdf5"#
+MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_pieta-1600.jpg"
+IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_triumph-of-bacchus-and-ariadne-1602.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
 DEFAULT_SAVE_PATH = "models/eval"
@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(description='Description')
 # parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model]')
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path",
-                    default="data/wikipaintings_small/wikipaintings_test", help="Path of test data")
+                    default="data/wikipaintings_full/wikipaintings_test", help="Path of test data")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -51,7 +51,7 @@ args = parser.parse_args()
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
 
 
-def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
+def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(2,2)):
     # target size is the size of the image to load in
     # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
     model = load_model(model_path)
@@ -146,7 +146,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         plt.figure(figsize=(16, 14))
     if normalise:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        fmt = '.1f'
+        fmt = '.2f'
         # sns.heatmap(cm, annot=True, fmt=".1f", cmap='Blues', linewidths=.5)
     else:
         fmt = 'd'
@@ -385,10 +385,11 @@ def plot_history_plotly(history, type, save=False, **kwargs):
         print("saved")
 
 def show_image(img_path):
-    img = load_img(img_path)
+    img = load_img(img_path, target_size=(224,224))
     x = img_to_array(img)
     plt.imshow(x/255.)
     plt.title('Original image')
+    plt.savefig(img_path.rsplit('/', 1)[1] + '_scaled.jpg')
     plt.show()
 
 def decode_image_autoencoder(model_path, img_path, target_size):
@@ -452,7 +453,7 @@ def evaluate():
 
 #show_image(IMG_PATH)
 #decode_image_autoencoder(MODEL_PATH, IMG_PATH, (224,224))
-#get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=156)
+#get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=171)
 evaluate()
 #his = pickle.load(open('models/resnet50_2-4-15-35_empty_layers-3-s-0/history.pck', 'rb'))
     #'models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
