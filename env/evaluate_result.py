@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(description='Description')
 # parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model]')
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path",
-                    default="data/wikipaintings_full/wikipaintings_test", help="Path of test data")
+                    default="data/wikipaintings_small/wikipaintings_test", help="Path of test data")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
