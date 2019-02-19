@@ -28,6 +28,10 @@ PATH = os.path.dirname(__file__)
 
 parser = argparse.ArgumentParser(description='Description')
 
+# TODO:
+# tidy up replace_type and layer_no options for -t tune option.
+# upload wiki small dataset sep later on
+
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
 parser.add_argument('--new_m', action="store", default='N', dest='new_path', help='Save in a new directory [Y|N]')
@@ -44,10 +48,10 @@ parser.add_argument('-r', action="store", default='none', dest='add_reg', choice
 parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
 parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
-parser.add_argument('--rep', action="store_true", default=False, dest='replace_type', help='Replace layers [range|end|one]')
-parser.add_argument('-ln', action="store", dest='layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
+#parser.add_argument('--rep', action="store", default='none', dest='replace_type', help='Replace layers [range|end|one]')
+#parser.add_argument('-ln', action="store", dest='layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
 parser.add_argument('-tr', action="store_true", default=False, dest='pretrained', help="Get pretrained model")
-parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train hyp case')
+parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train_hyp case')
 parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanaced data')
 
 args = parser.parse_args()
@@ -75,9 +79,9 @@ elif args.add_reg == 'l1':
 else:
     REG = l2
 
-changed = False
-TRAIN_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")#join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")##join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_val")# join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#
+changed = False # join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")
+TRAIN_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_train")#join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")##join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
+VAL_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_val")# join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#
 
 INPUT_SHAPE = (224, 224, 3)
 
