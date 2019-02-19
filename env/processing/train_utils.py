@@ -18,6 +18,7 @@ from keras.preprocessing.image import load_img, img_to_array
 from keras.callbacks import LearningRateScheduler
 import re
 import sys
+import pandas, json
 
 dirname = os.path.dirname(__file__)
 MODEL_DIR = "models/logs"
@@ -25,7 +26,7 @@ N_CLASSES = 25
 
 def fixed_generator(generator):
     for batch in generator:
-        yield (batch, batch)
+        yield (batch[0], batch[0])
         #yield batch
 # Code influenced by keras application examples
 # that from rasta and from ...
@@ -505,8 +506,56 @@ def merge_two_dicts(x, y):
     z.update(y)    # modifies z with y's keys and values & returns None
     return z
 
+cmds= {
+    "t": "train_type",
+    "b": "batch_size",
+    "e": "epochs",
+    "f": "horizontal_flip",
+    "n": "n_layers_trainable",
+    "opt": "optimiser",
+    "decay": "add_decay",
+    "r": "add_reg",
+    "alp": "alpha",
+    "dropout": "add_drop",
+    "mom": "add_mom",
+    "w": "add_wei"
+}
+def save_ordered(csv_path):
+    data = pandas.read_csv(csv_path, encoding='utf-8-sig')
+    headers = list(data[:0])
+    sorted = data.sort_values("max_val_acc", ascending=False)
+    sorted.to_csv(join(csv_path.rsplit('/', 1)[0], '_output_ordered.csv'), header=headers, index=True)
+    return sorted
+
+def get_best_comb_from_csv(csv_path, sorted, params, top=3, save=False):
+    print(sorted)
+    best = "Best Combination of "
+    for p in params:
+        best += p.replace("-", "")
+        best += "-"
+    best = best.rsplit("-", 1)[0] + ": " + "\n"
+
+    combs = {}
+    for i in range(top):
+        #r = sorted.iloc(i)
+        dic = {}
+        for p in params:
+            dic[p] = sorted.loc[i,cmds[p]]#.iloc(i)
+            if i == 0:
+                best += p + ": " + str(dic[p]) + "\n"
+        dic["max_val_acc"] = round(sorted.loc[i,"max_val_acc"],4)#.iloc(i)
+        combs[str(i+1)] = dic
+    best += "Highest Validation Accuracy: " + str(round(combs["1"]["max_val_acc"],4)) + "\n"
+    best += ''.join('{}{}\n'.format(key, val) for key, val in combs.items())
+    print(best)
+
+    if save:
+        with open(join(csv_path.rsplit('/', 1)[0], '_output_top_' + str(top) + '.json'), 'w') as f:
+            json.dump(combs, f)
+    return best
+
 if __name__=='__main__':
-    DATA_PATH = 'data/wikipaintings_full/wikipaintings_train/Abstract_Art/ad-reinhardt_collage-1938.jpg'
+    '''DATA_PATH = 'data/wikipaintings_full/wikipaintings_train/Abstract_Art/ad-reinhardt_collage-1938.jpg'
     x = load_img(DATA_PATH, target_size=(224, 224))
     print("current")
     x = img_to_array(x)
@@ -517,7 +566,9 @@ if __name__=='__main__':
     #print(x)
     print("using wp")
     temp = wp_preprocess_input(temp)
-    print(temp)
+    print(temp)'''
+
+    get_best_comb_from_csv("../models/train_hyp_2-11-23-11/_output.csv", ['decay', 'mom'], save=True)
 
 
 
