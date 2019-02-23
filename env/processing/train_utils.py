@@ -32,26 +32,6 @@ def fixed_generator(generator):
 # that from rasta and from ...
 
 def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
-    '''
-    input = Input(shape=(28, 28, 1))  # adapt this if using `channels_first` image data format
-
-    x = Conv2D(16, (3, 3), activation='relu', padding='same')(input)
-    x = MaxPooling2D((2, 2), padding='same')(x)
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-    x = MaxPooling2D((2, 2), padding='same')(x)
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-    encoded = MaxPooling2D((2, 2), padding='same')(x)
-
-    # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-    x = UpSampling2D((2, 2))(x)
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-    x = UpSampling2D((2, 2))(x)
-    x = Conv2D(16, (3, 3), activation='relu')(x)
-    x = UpSampling2D((2, 2))(x)
-    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
-    '''
     input = Input(shape=input_shape)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(input)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
@@ -72,30 +52,32 @@ def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
 # resnet
 def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(input)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2,2), padding='same')(x)
+    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = MaxPooling2D((2, 2), padding='same')(x)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    encoded = MaxPooling2D((2, 2), padding='same')(x)
 
-    x = Conv2D(64, (7, 7), strides=(2, 2), activation='relu', data_format='channels_last',
-               kernel_initializer=VarianceScaling(scale=2.0))(input)
-    x = BatchNormalization(axis=3)
-    x = MaxPooling2D((3, 3), strides=(2, 2))(x)
-    x = Conv2D(64, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
-    x = BatchNormalization(axis=3)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same', kernel_initializer=VarianceScaling(scale=2.0))(x)
-    x = BatchNormalization(axis=3)
-    x = Conv2D(256, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
-    encoded = MaxPooling2D((2, 2))(x)
-
-    # at this point the representation is (8, 4, 4) i.e. 128-dimensional
-
-    x = Conv2D(256, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(encoded)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(encoded)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
+    #x = UpSampling2D((2,2))(x)
+    x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(encoded)
+    x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(x)
+    x = UpSampling2D((2,2))(x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)  # x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
     x = UpSampling2D((2, 2))(x)
-    x = BatchNormalization(axis=3)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same', kernel_initializer=VarianceScaling(scale=2.0))(x)
-    x = BatchNormalization(axis=3)
-    x = Conv2D(64, (1, 1), strides=(1, 1), activation='relu', kernel_initializer=VarianceScaling(scale=2.0))(x)
-    x = UpSampling2D((3, 3))(x)
-    decoded = Conv2D(3, 3, 3, activation='sigmoid', border_mode='same')(x)
+    decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
 
     return input, decoded
+
+
 
 
 def get_test1(input_shape, add_reg, alpha, dropout=0.0, pretrained=False):
@@ -248,34 +230,52 @@ def get_new_model(model_type, input_shape, reg, alpha, drop, pretrained):
         model = Model(inputs=base_model.input, outputs=output)
     return model, data_type
 
-def copy_weights(old_model, new_model, replace_type, layer_no):
-    if replace_type == 'range':
-        if '-' not in layer_no:
-            return None
-        else:
-            try:
-                start = int(layer_no.split('-')[0])
-                end = int(layer_no.split('-')[1])
-                for i in range(start, end+1):
-                    new_model.layers[i].set_weights(old_model.layers[i].get_weights())
-            except ValueError:
-                return None
-    elif replace_type == 'end':
-        try:
+def copy_range(old_model, new_model, range):
+    try:
+        start = int(range.split('-')[0])
+        end = int(range.split('-')[1])
+        for i in range(start, end + 1):
+            new_model.layers[i].set_weights(old_model.layers[i].get_weights())
+    except ValueError:
+        sys.exit("ValueError: incorrect range of layers specified")
+
+    return new_model
+
+def copy_layer(old_model, new_model, layer_no):
+    try :
+        if int(layer_no) > 0:
             index = int(layer_no)
-            for i in range(index, len(new_model.layers)):
-                new_model.layers[i].set_weights(old_model.layers[i].get_weights())
-        except ValueError:
-            return None
-    else:
-        # layer
-        if layer_no.isdigit():
-            if int(layer_no) > 0:
-                index = int(layer_no)
-                if index >= len(new_model.layers):
-                    return None
+            if index >= len(new_model.layers):
+                return None
+            else:
+                new_model.layers[index].set_weights(old_model.layers[index].get_weights())
+    except ValueError:
+        sys.exit("ValueError: incorrect index of layer specified")
+    return new_model
+
+copy_type = {
+    'range':copy_range,
+    'layer':copy_layer
+}
+
+def copy_weights(old_model, new_model, layer_no):
+    if '-' in layer_no:
+        if ',' in layer_no:
+            splits = layer_no.split(',')
+            for o in splits:
+                if '-' in o:
+                    new_model = copy_type['range'](old_model, new_model, o)
                 else:
-                    new_model.layers[index].set_weights(old_model.layers[index].get_weights())
+                    new_model = copy_type['layer'](old_model, new_model, o)
+
+        else:
+            new_model = copy_type['range'](old_model, new_model, layer_no)
+    elif ',' in layer_no:
+        splits = layer_no.split(',')
+        for o in splits:
+            new_model = copy_type['layer'](old_model, new_model, o)
+    else:
+        new_model = copy_type['layer'](old_model, new_model, layer_no)
     return new_model
 
 def set_trainable_layers(model, layers):
@@ -332,22 +332,57 @@ def set_trainable_layers(model, layers):
             sys.exit("Error in input of the number of trainable layers")
     else:
         try:
-            start = int(layers.split('-')[0])
-            end = int(layers.split('-')[1])
-            if start >= len(model.layers) or end >= len(model.layers) or start < 0 or end < 0 or start >= end:
-                raise ValueError
-            for layer in model.layers[start:end+1]:
-                if layer.trainable == False:
-                    changed = True
-                layer.trainable = True
-            for layer in model.layers[0:start]:
-                if layer.trainable == True:
-                    changed = True
-                layer.trainable = False
-            for layer in model.layers[end+1:]:
-                if layer.trainable == True:
-                    changed = True
-                layer.trainable = False
+            if ',' in layers:
+                multi = layers.split(',')
+                if '-' in multi[0]:
+                    start = int(multi[0].split('-')[0])
+                else:
+                    start = multi[0]
+                if '-' in multi[len(multi)-1]:
+                    end = int(multi[len(multi)-1].split('-')[1])
+                else:
+                    end = multi[len(multi)-1]
+                for layer in model.layers[0:start]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+                for layer in model.layers[end + 1:]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+                for i in range(len(multi)):
+                    if '-' in multi[i]:
+                        start = int(multi[i].split('-')[0])
+                        end = int(multi[i].split('-')[1])
+                        if start >= len(model.layers) or end >= len(
+                                model.layers) or start < 0 or end < 0 or start >= end:
+                            raise ValueError
+                        for layer in model.layers[start:end + 1]:
+                            if layer.trainable == False:
+                                changed = True
+                            layer.trainable = True
+                    else:
+                        if model.layers[multi[i]].trainable == False:
+                            changed = True
+                        model.layers[multi[i]].trainable = True
+
+            else:
+                start = int(layers.split('-')[0])
+                end = int(layers.split('-')[1])
+                if start >= len(model.layers) or end >= len(model.layers) or start < 0 or end < 0 or start >= end:
+                    raise ValueError
+                for layer in model.layers[start:end + 1]:
+                    if layer.trainable == False:
+                        changed = True
+                    layer.trainable = True
+                for layer in model.layers[0:start]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
+                for layer in model.layers[end + 1:]:
+                    if layer.trainable == True:
+                        changed = True
+                    layer.trainable = False
         except ValueError:
             sys.exit("Error in input of the number of trainable layers")
     return model, changed
@@ -359,13 +394,16 @@ def get_model_name(sample_no, type='empty', multi=False, model_type='resnet50', 
             name = model_type + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
             name = name + "_empty"
         else:
-            kwargs["    "]
+            pass
     else:
         name = kwargs["name"].rsplit("_", 1)[0] + '_' + type  # just get model_type_time form
     if n_tune == 0:
-        tune = 'full1'
+        tune = 'full'
     else:
-        tune = str(n_tune)
+        if ',' in str(n_tune):
+            tune = str(n_tune).replace(',', '_')
+        else:
+            tune = str(n_tune)
     name = name + '_layers-' + tune
     name = name + "-s-" + str(sample_no)
     return name

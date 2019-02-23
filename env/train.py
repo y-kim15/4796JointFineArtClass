@@ -29,12 +29,11 @@ PATH = os.path.dirname(__file__)
 parser = argparse.ArgumentParser(description='Description')
 
 # TODO:
-# tidy up replace_type and layer_no options for -t tune option.
 # upload wiki small dataset sep later on
 
 parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
-parser.add_argument('--new_m', action="store", default='N', dest='new_path', help='Save in a new directory [Y|N]')
+parser.add_argument('--new_p', action="store_true", default=False, dest='new_path', help='Save in a new directory')
 parser.add_argument('--model_type', action='store', default='test1', dest='model_type', required=True, help='Type of model [test1|test2|test3|auto1|auto2|vgg16|inceptionv3|resnet50]')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
@@ -48,8 +47,7 @@ parser.add_argument('-r', action="store", default='none', dest='add_reg', choice
 parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
 parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
-#parser.add_argument('--rep', action="store", default='none', dest='replace_type', help='Replace layers [range|end|one]')
-#parser.add_argument('-ln', action="store", dest='layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
+parser.add_argument('-ln', action="store", default=None, dest='rep_layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
 parser.add_argument('-tr', action="store_true", default=False, dest='pretrained', help="Get pretrained model")
 parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train_hyp case')
 parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanaced data')
@@ -79,14 +77,13 @@ elif args.add_reg == 'l1':
 else:
     REG = l2
 
-changed = False # join(PATH, "data/wiki_small_2_" + str(SAMPLE_N), "small_train")
-TRAIN_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_train")#join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")##join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
-VAL_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_val")# join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#
+changed = False
+TRAIN_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_train")
+VAL_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_val")
 
 INPUT_SHAPE = (224, 224, 3)
 
 if train_type != 'empty':
-    # MODEL_TYPE = ''
     MODEL_PATH = args.model_path
     if MODEL_PATH is None:
         sys.exit("Error: model path should be provided for retraining/tuning.")
@@ -99,16 +96,17 @@ if train_type != 'empty':
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
     if train_type == 'tune':
         new_model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, pretrained=args.pretrained)
-        if args.replace_type!= None:
-            if args.layer_no.isdigit() and int(args.layer_no) ==0:
+        if args.rep_layer_no!= None:
+            # give this value 0 if you want to copy the whole model to the new with end weights
+            if args.rep_layer_no.isdigit() and int(args.rep_layer_no) ==0:
                 model = model.load_weights(join(MODEL_PATH.rplit('/',1)[0], '_end_weights.h5'))
             else:
-                model = copy_weights(model, new_model, args.replace_type, args.layer_no)
+                model = copy_weights(model, new_model, args.rep_layer_no)
             if model == None:
                 sys.exit('Incorrect command line attribute of replacing layer weights!')
             changed = True
-    if args.new_path == 'Y':
-        dir_path = join(MODEL_PATH.split('/')[0], MODEL_PATH.split('/')[1], train_type +'-tune-'+str(N_TUNE), name)
+    if args.new_path:
+        dir_path = join(MODEL_PATH.rsplit('/', 2)[0], name)
     else:
         dir_path = join(MODEL_PATH.rsplit('/', 1)[0], name)
     create_dir(dir_path)
@@ -200,10 +198,15 @@ else:
                                   epochs=N_EPOCHS, class_weight=WEIGHTS)
 end =time.time()
 model.save(join(dir_path, name + ".hdf5"))
-#ints = 'e_'.join([str(x) for x in list(range(N_EPOCHS))])
-extra = {'train_loss': history.history['loss'][-1],'train_acc':history.history['acc'][-1], 'val_loss':
-    history.history['val_loss'][-1],'val_acc': history.history['val_acc'][-1], 'e':history.history['val_acc'].index(max(history.history['val_acc'])),
-         'max_val_acc': max(history.history['val_acc']),'run_time': str(end-start)}
+
+extra1 = {'train_loss': history.history['loss'][-1], 'val_loss':
+    history.history['val_loss'][-1], 'run_time': str(end-start)}
+if re.search('auto*', MODEL_TYPE):
+    extra2 = {'train_acc':history.history['acc'][-1], 'val_acc': history.history['val_acc'][-1],'e':history.history['val_acc'].index(max(history.history['val_acc'])),
+         'max_val_acc': max(history.history['val_acc'])}
+    extra = merge_two_dicts(extra1, extra2)
+else:
+    extra = extra1
 orig = vars(args)
 orig['path'] = dir_path + '/' + name
 data = merge_two_dicts(orig, extra)

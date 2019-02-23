@@ -18,10 +18,10 @@ models = {
         "-lr": [0.001, 0.01, 0.1]
     },
     "resnet50": {
-        "--model_type": ["resnet50"],
-        "-e": [5], #[5,10,15]
-        "-b": [80], #[60, 70, 80],
-        "-n": [3] #[3, "169-172", "164-168", "159-163"],
+        "--model_type": "resnet50",
+        "-e": 5, #[5,10,15]
+        "-b": 60, #[60, 70, 80],
+        "-n": 3 #[3, "169-172", "164-168", "159-163"],
     },
     "vgg16": {
         "--model_type": "vgg16",
@@ -74,9 +74,6 @@ if TYPE == 'params':
         params = merge_two_dicts(models["common"], models[MODEL])
     # execute
     start = time.time()
-    print("print keys", params.keys())
-    print("print values", params.values())
-    print("print combs\n", itertools.product(params.values()))
     lists = {}
     for k,v in params.items():
         if isinstance(v, list):
@@ -87,13 +84,17 @@ if TYPE == 'params':
             else:
                 command += [k, str(v)]
     if lists:
-        for combs in itertools.product(lists.values()):
-            for k, v in zip(lists.keys(), combs):
-                command += [k, str(v)]
-            command += path
-            command += ["-tr", ""]
-            print("print command: \n", command)
-            subprocess.call(command)
+        vals = [x for x in list(lists.values())]
+        copy = command.copy()
+        for comb in itertools.product(*vals):
+            cmd = None
+            cmd = copy + []
+            for k, v in zip(lists.keys(), comb):
+                cmd += [k, str(v)]
+            cmd += path
+            cmd += ["-tr"]
+            print("print command: \n", cmd)
+            #subprocess.call(command)
     else:
         print("print command just one: \n", command)
         subprocess.call(command)

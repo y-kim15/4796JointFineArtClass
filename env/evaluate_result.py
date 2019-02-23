@@ -15,7 +15,7 @@ from bokeh.plotting import figure, show, output_file
 import pandas as pd
 import argparse
 from processing.clean_csv import create_dir
-import os
+import os, json
 import pickle
 import itertools
 
@@ -30,10 +30,10 @@ N_CLASSES = 25
 
 parser = argparse.ArgumentParser(description='Description')
 
-# parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model]')
+parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path",
-                    default="data/wikipaintings_small/wikipaintings_test", help="Path of test data")
+                    default="data/wikipaintings_full/wikipaintings_test", help="Path of test data")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -71,7 +71,16 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(2,2)):
     new_x = x[np.newaxis,:,:,:]
     print("new shape of x ", x.shape)
     activations = act_model.predict(new_x, batch_size=1)
-    act = activations[layer_no]
+    if layer_no.isdigit() or isinstance(layer_no, int):
+        act = activations[layer_no]
+    else: #returned is name of layer
+        index = None
+        for idx, layer in enumerate(model.layers):
+            if layer.name == layer_no:
+                index = idx
+                print("layer name: ", layer_no, ", with index: ", index)
+                break
+        act = activations[index]
     i = 0
     print("original")
     plt.imshow(img)
@@ -205,6 +214,8 @@ def get_pred(model_path, image_path, top_k=1):
     dico = get_dico()
     inv_dico = invert_dico(dico)
     args_sorted = np.argsort(pred)[0][::-1]
+    #print("predicted percents: ")
+    #print(args_sorted[:top_k])
     preds = [inv_dico.get(a) for a in args_sorted[:top_k]]
     pcts = [pred[0][a] for a in args_sorted[:top_k]]
     return preds, pcts
@@ -432,23 +443,36 @@ def evaluate():
     DATA_PATH = args.data_path
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
-    y_pred, y_true = get_acc(MODEL_PATH, DATA_PATH, k=K)
-    name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
-    SHOW = args.show_g
     SAVE = args.save
     if SAVE:
-          SAVE_PATH = args.save_path
-        #SAVE_PATH = join(args.save_path, name)
-        #create_dir(join(SAVE_PATH, name))
+        SAVE_PATH = args.save_path
+    # SAVE_PATH = join(args.save_path, name)
+    # create_dir(join(SAVE_PATH, name))
     else:
         SAVE_PATH = None
+    if args.type == 'acc':
+        y_pred, y_true = get_acc(MODEL_PATH, DATA_PATH, k=K)
+        name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
+        SHOW = args.show_g
 
-    if args.get_cm:
-        cm = get_confusion_matrix(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
-    if args.get_class_report:
-        classes = get_dico().keys()
-        get_classification_report(y_true, y_pred, classes, name, 'classification report: ' + name, show=SHOW, save=SAVE,
-                                  path=SAVE_PATH)
+
+        if args.get_cm:
+            cm = get_confusion_matrix(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+        if args.get_class_report:
+            classes = get_dico().keys()
+            get_classification_report(y_true, y_pred, classes, name, 'classification report: ' + name, show=SHOW,
+                                      save=SAVE,
+                                      path=SAVE_PATH)
+    else:
+        v = 5#K[0]
+        pred, pcts = get_pred(MODEL_PATH, DATA_PATH, top_k=v)
+        print(pcts)
+        if SAVE:
+            result = {'pred': pred, 'k': v}
+            print(json.dumps(result))
+        else:
+            print("Top-{} prediction : {}".format(k, pred))
+
 
 
 #show_image(IMG_PATH)
