@@ -30,7 +30,7 @@ N_CLASSES = 25
 
 parser = argparse.ArgumentParser(description='Description')
 
-parser.add_argument('-t', action="store", default='acc', dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
+parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path",
                     default="data/wikipaintings_full/wikipaintings_test", help="Path of test data")
@@ -38,20 +38,21 @@ parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='T
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
                     help='Get Classification Report')
-parser.add_argument('-show', action="store_true", dest='show_g', default=False, help='Display graphs')
+parser.add_argument('--show', action="store_true", dest='show_g', default=False, help='Display graphs')
 parser.add_argument('-s', action="store_true", dest='save', default=False, help='Save graphs')
 parser.add_argument('--save', action="store", default=DEFAULT_SAVE_PATH, dest='save_path',
                     help='Specify save location')
-# parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', help='Add dropout rate [0-1]')
-# parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', help='Add momentum to SGD')
+parser.add_argument('--his', action="store", dest='plot_his', help='Plot history, choose which to plot [l|a|b (default)]')
+parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot (extension pck)')
+parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Mandatory to call --his')
+parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer (layer name or index)')
 # parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
 args = parser.parse_args()
-
 
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
 
 
-def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(2,2)):
+def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
     # target size is the size of the image to load in
     # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
     model = load_model(model_path)
@@ -96,7 +97,6 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(2,2)):
             i += 1
 
     plt.show()
-
 
 
 def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
@@ -472,13 +472,42 @@ def evaluate():
             print(json.dumps(result))
         else:
             print("Top-{} prediction : {}".format(k, pred))
+his_type = {
+    'a': 'Accuracy',
+    'l': 'Loss'
+}
 
+def plot():
+    if args.plot_his is not None:
+        his_t = args.plot_his
+        his = pickle.load(open(args.file, 'rb'))
+        if his_t == 'b':
+            his_t = 'a'
+        plot_history_hover(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name+" "+his_type[his_t]+" Plot")
+        if his_t == 'Accuracy' and args.plot_his != 'a':
+            his_t = 'l'
+            plot_history_hover(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + " " + his_type[his_t] + " Plot")
+    elif args.act is not None:
+        MODEL_PATH = args.model_path
+        DATA_PATH = args.data_path
+        #model_path, img_path, target_size, layer_no, plot_size=(2,2))
+        layer_no = args.act
+        get_act_map(MODEL_PATH, DATA_PATH, (224, 224), layer_no=layer_no)
 
+# evaluate for finding model accuracy and prediction by running the model on test set
+# should have -t tag indicating one of the options
+if args.type is not None:
+    evaluate()
+# anything else including visualising activation maps and plotting history
+# --act (need -m, -d (has to be a path to an image file in this case), --act (layer name/index), --show, -s, --save)
+# --his (need -f, --show, -s, --save)
+else:
+    plot()
 
 #show_image(IMG_PATH)
 #decode_image_autoencoder(MODEL_PATH, IMG_PATH, (224,224))
 #get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=171)
-evaluate()
+
 #his = pickle.load(open('models/resnet50_2-4-15-35_empty_layers-3-s-0/history.pck', 'rb'))
     #'models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
      #                  '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
