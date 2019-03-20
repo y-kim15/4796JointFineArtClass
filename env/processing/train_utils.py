@@ -17,7 +17,6 @@ import datetime
 import os
 from os.path import join
 import math
-from keras.preprocessing.image import load_img, img_to_array
 from keras.callbacks import LearningRateScheduler
 import re
 import sys
@@ -118,7 +117,7 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
 
     return base_model, output
 
-# added pooling set up, will be added automatically,
+
 def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
     if not pretrained:
         base_model = ResNet50(input_shape=input_shape, weights=None, include_top=False, pooling='avg')
@@ -126,23 +125,14 @@ def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
         base_model = ResNet50(input_shape=input_shape, weights='imagenet', include_top=False, pooling='avg')
 
     x = base_model.output
-    if dropout > 0:
-        x = Dropout(dropout)(x)
-    #x = AveragePooling2D(strides=(1,1))(x)
-   # x = Flatten()(x)
     #x = GlobalAveragePooling2D(data_format='channels_last')(x)
-
-    #added below # tried changing 128 -> 64
-    if add_reg != None:
-        x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    else:
-        x = Dense(128, activation='relu')(x)
+    # added below
+    x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
     # up to above
     output = Dense(N_CLASSES, activation='softmax')(x)
     return base_model, output
-
 
 get_model = {
     "inceptionv3": get_inceptionv3,
