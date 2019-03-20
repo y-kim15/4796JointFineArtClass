@@ -127,7 +127,10 @@ def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
     x = base_model.output
     #x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
-    x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    if add_reg is not None:
+        x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    else:
+        x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
     # up to above
@@ -220,12 +223,12 @@ def set_trainable_layers(model, layers):
         try:
             if ',' not in layers:
                 v = int(layers)
-                if v > 0 and v <= 10:
-                    for layer in model.layers[:len(model.layers) - v]:
+                if v > 0 and v < len(model.layers):
+                    for layer in model.layers[:len(model.layers) - v + 1]:
                         if layer.trainable == True:
                             changed = True
                         layer.trainable = False
-                    for layer in model.layers[len(model.layers) - v:]:
+                    for layer in model.layers[len(model.layers) - v + 1:]:
                         if layer.trainable == False:
                             changed = True
                         layer.trainable = True
@@ -234,18 +237,6 @@ def set_trainable_layers(model, layers):
                         if layer.trainable == False:
                             changed = True
                         layer.trainable = True
-                else:
-                    if model.layers[v].trainable == False:
-                        changed = True
-                    model.layers[v].trainable = True
-                    for layer in model.layers[:v]:
-                        if layer.trainable == True:
-                            changed = True
-                        layer.trainable = False
-                    for layer in model.layers[v + 1:]:
-                        if layer.trainable == True:
-                            changed = True
-                        layer.trainable = False
             else:
                 ls = layers.split(',')
                 for n, i in zip(range(len(ls)), ls):

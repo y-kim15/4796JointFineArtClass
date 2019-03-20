@@ -3,7 +3,6 @@ from keras.models import Model
 from keras.layers import Dropout
 from keras import layers
 from keras import backend as K
-from rasta.python.resnet_build import ResnetBuilder
 from keras.layers import Input,Activation,Flatten,Conv2D,MaxPooling2D,ZeroPadding2D,AveragePooling2D,GlobalAveragePooling2D,GlobalMaxPooling2D,BatchNormalization
 from keras.layers import Dense
 from keras.engine.topology import get_source_inputs
@@ -46,16 +45,6 @@ def empty_resnet():
 
 
 
-def resnet18():
-    return ResnetBuilder.build_resnet_18((3,224,224),25)
-def resnet34():
-    return ResnetBuilder.build_resnet_34((3,224,224),25)
-def resnet101():
-    return ResnetBuilder.build_resnet_101((3,224,224),25)
-def resnet152():
-    return ResnetBuilder.build_resnet_152((3,224,224),25)
-
-
 # extended implementation of custom resnet to include option to set initialiser and regulariser
 # init should be string, will use default glorot uniform of conv layer and dense layer if not specified
 def custom_resnet(add_reg=None, alpha=None, init=None, n=0,dp_rate=0):
@@ -68,10 +57,10 @@ def custom_resnet(add_reg=None, alpha=None, init=None, n=0,dp_rate=0):
     #input_shape = _obtain_input_shape(input_shape,default_size=224,min_size=197,data_format=K.image_data_format(),include_top=include_top)
     kernel_regularizer=None
     if add_reg is not None and alpha is not None:
-    kernel_regularizer = add_reg(alpha)
-    kernel_initialiser='glorot_uniform'
+        kernel_regularizer = add_reg(alpha)
+    kernel_initializer='he_normal'
     if init is not None:
-        kernel_initialiser=init
+        kernel_initializer=init
         #kernel_initialiser='he_normal'
 
     img_input = Input(shape=(224,224,3))
@@ -82,36 +71,51 @@ def custom_resnet(add_reg=None, alpha=None, init=None, n=0,dp_rate=0):
         bn_axis = 1
 
     x = ZeroPadding2D((3, 3))(img_input)
-    x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1', kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer)(x)
+    x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1', kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)(x)
     x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
     x = Activation('relu')(x)
     x = MaxPooling2D((3, 3), strides=(2, 2))(x)
 
-    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1),
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
 
 
-    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
 
     x = Dropout(dp_rate)(x)
 
-    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
+    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
 
     x = Dropout(dp_rate)(x)
 
     x = AveragePooling2D((7, 7), name='avg_pool')(x)
 
     x = Flatten()(x)
-    x = Dense(25, activation='softmax', name='fc1000')(x)
+    kernel_initializer='glorot_uniform'
+    x = Dense(25, activation='softmax', name='fc1000',
+    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)(x)
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
 
@@ -137,7 +141,7 @@ def custom_resnet(add_reg=None, alpha=None, init=None, n=0,dp_rate=0):
 
 # cp from keras-application/keras_applications/resnet50
 # replaced backend with K
-def identity_block(input_tensor, kernel_size, filters, stage, block):
+def identity_block(input_tensor, kernel_size, filters, stage, block, kernel_initializer, kernel_regularizer):
     """The identity block is the block that has no conv layer at shortcut.
     # Arguments
         input_tensor: input tensor
@@ -158,20 +162,20 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
     x = layers.Conv2D(filters1, (1, 1),
-                    kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+                    kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2a')(input_tensor)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
     x = layers.Activation('relu')(x)
 
     x = layers.Conv2D(filters2, kernel_size,
-                      padding='same', kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+                      padding='same', kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2b')(x)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
     x = layers.Activation('relu')(x)
 
-    x = layers.Conv2D(filters3, (1, 1), kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+    x = layers.Conv2D(filters3, (1, 1), kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2c')(x)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
@@ -186,6 +190,8 @@ def conv_block(input_tensor,
                filters,
                stage,
                block,
+               kernel_initializer,
+               kernel_regularizer,
                strides=(2, 2)):
     """A block that has a conv layer at shortcut.
     # Arguments
@@ -210,24 +216,24 @@ def conv_block(input_tensor,
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    x = layers.Conv2D(filters1, (1, 1), strides=strides,kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+    x = layers.Conv2D(filters1, (1, 1), strides=strides,kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2a')(input_tensor)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
     x = layers.Activation('relu')(x)
 
-    x = layers.Conv2D(filters2, kernel_size, padding='same',kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+    x = layers.Conv2D(filters2, kernel_size, padding='same',kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2b')(x)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
     x = layers.Activation('relu')(x)
 
-    x = layers.Conv2D(filters3, (1, 1),kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+    x = layers.Conv2D(filters3, (1, 1),kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                       #kernel_initializer='he_normal',
                       name=conv_name_base + '2c')(x)
     x = layers.BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
 
-    shortcut = layers.Conv2D(filters3, (1, 1), strides=strides,kernel_initialiser=kernel_initialiser, kernel_regularizer=kernel_regularizer,
+    shortcut = layers.Conv2D(filters3, (1, 1), strides=strides,kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer,
                              #kernel_initializer='he_normal',
                              name=conv_name_base + '1')(input_tensor)
     shortcut = layers.BatchNormalization(
