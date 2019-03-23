@@ -32,8 +32,8 @@ parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
-parser.add_argument('-d', action="store", dest="data_path",
-                    default="data/wikipaintings_full/wikipaintings_test", help="Path of test data")
+parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
+parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -152,7 +152,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     cm = confusion_matrix(y_true, y_pred)
     orig_cm = cm
     if show:
-        plt.figure(figsize=(16, 14))
+        plt.figure(figsize=(18, 18))
     if normalise:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         fmt = '.2f'
@@ -343,7 +343,7 @@ def plot_history_hover(history, type, add_title=True, show_up=True, save=False, 
         show(p)
 
 #https://plot.ly/python/line-charts/
-def plot_history_plotly(history, type, save=False, **kwargs):
+def plot_history_plotly(history, type, name, path=None, save=False, show=False):
     import plotly
     import plotly.graph_objs as go
     if type == 'Loss':
@@ -387,11 +387,10 @@ def plot_history_plotly(history, type, save=False, **kwargs):
     fig = dict(data=data, layout=layout)
 
     if save:
-        if 'path' in kwargs:
-            path = kwargs['path']
-        if 'name' in kwargs:
-            name = kwargs['name']
-        plotly.offline.plot(fig, filename=join(path, name+'.html'), auto_open=False)
+        open = False
+        if show:
+            open = True
+        plotly.offline.plot(fig, filename=join(path, name+'.html'), auto_open=open)
         print(join(path, name + '.html'))
         print("saved")
 
@@ -440,7 +439,13 @@ def invert_dico(dico):
 
 def evaluate():
     MODEL_PATH = args.model_path
-    DATA_PATH = args.data_path
+    if args.data_path is not None:
+        DATA_PATH = args.data_path
+    else:
+        if args.data_size is not None and args.data_size=='f':
+            DATA_PATH = "data/wikipaintings_full/wikipaintings_test"
+        else:
+            DATA_PATH = "data/wikipaintings_small/wikipaintings_test"
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
     SAVE = args.save
@@ -483,10 +488,10 @@ def plot():
         his = pickle.load(open(args.file, 'rb'))
         if his_t == 'b':
             his_t = 'a'
-        plot_history_hover(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name+" "+his_type[his_t]+" Plot")
-        if his_t == 'Accuracy' and args.plot_his != 'a':
+        plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name+" "+his_type[his_t]+" Plot", show=args.show_g)
+        if args.plot_his == 'b':
             his_t = 'l'
-            plot_history_hover(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + " " + his_type[his_t] + " Plot")
+            plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + " " + his_type[his_t] + " Plot", show=args.show_g)
     elif args.act is not None:
         MODEL_PATH = args.model_path
         DATA_PATH = args.data_path
