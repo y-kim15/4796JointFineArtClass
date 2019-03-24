@@ -1,6 +1,8 @@
 from keras.models import load_model, Model
 from keras.preprocessing.image import load_img, img_to_array
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+import matplotlib
+matplotlib.use("agg")
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import seaborn as sns
@@ -177,7 +179,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         plt.savefig(path + '/conf_matrix_' + name + '.svg', format='svg')
     if show:
         plt.show()
-
+    print(cm)
     return orig_cm
 
 
@@ -426,7 +428,8 @@ def decode_image_autoencoder(model_path, img_path, target_size):
 def get_dico():
     classes = []
     PATH = os.path.dirname(__file__)
-    directory = join(PATH, 'data/wikipaintings_small/wikipaintings_train')
+    #directory = join(PATH, 'data/wikipaintings_small/wikipaintings_train')
+    directory = "/cs/tmp/yk30/data/wikipaintings_small/wikipaintings_train"
     for subdir in sorted(os.listdir(directory)):
         if os.path.isdir(os.path.join(directory, subdir)):
             classes.append(subdir)

@@ -89,11 +89,19 @@ def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
     x = base_model.output
     x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
-    x = Dense(128, activation='relu')(x)  # , kernel_regularizer=add_reg(alpha))(x)
+    if add_reg is not None and dropout > 0:
+        x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    elif add_reg is None and dropout > 0:
+        x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
+    #else:
+    #    x = Dense(128, activation='relu')(x)
     # up to above
-    output = Dense(N_CLASSES, activation='softmax')(x)
+    if add_reg is not None:
+        output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
+    else:
+        output = Dense(N_CLASSES, activation='softmax')(x)
     return base_model, output
 
 
@@ -108,12 +116,19 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
     x = GlobalAveragePooling2D()(x)
     # let's add a fully-connected layer
     # added below
-    x = Dense(128, activation='relu')(x)  # , kernel_regularizer=add_reg(alpha))(x)
+    if add_reg is not None and dropout > 0:
+        x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
+    elif add_reg is None and dropout > 0:
+        x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
+    #else:
+    #    x = Dense(128, activation='relu')(x)
     # up to above
-    # and a logistic layer -- let's say we have 200 classes
-    output = Dense(N_CLASSES, activation='softmax')(x)
+    if add_reg is not None:
+        output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
+    else:
+        output = Dense(N_CLASSES, activation='softmax')(x)
 
     return base_model, output
 
@@ -127,14 +142,19 @@ def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
     x = base_model.output
     #x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
-    if add_reg is not None:
+    if add_reg is not None and dropout > 0:
         x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    else:
+    elif add_reg is None and dropout > 0:
         x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
+    #else:
+    #    x = Dense(128, activation='relu')(x)
     # up to above
-    output = Dense(N_CLASSES, activation='softmax')(x)
+    if add_reg is not None:
+        output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
+    else:
+        output = Dense(N_CLASSES, activation='softmax')(x)
     return base_model, output
 
 get_model = {
@@ -158,8 +178,12 @@ def get_rasta_model(model_name, n_train, reg, alpha, init, drop):
 
 def get_new_model(model_type, input_shape, reg, alpha, init, drop, pretrained, n_train):
     data_type = True
+    if int(pretrained)==1:
+        tr = True
+    else:
+        tr = False
     if model_type in get_model:
-        base_model, output = get_model[model_type](input_shape, reg, alpha, drop, pretrained)
+        base_model, output = get_model[model_type](input_shape, reg, alpha, drop, tr)
         if re.search('auto*', model_type):
             data_type = False
             model = Model(inputs=base_model, outputs=output)
@@ -167,6 +191,13 @@ def get_new_model(model_type, input_shape, reg, alpha, init, drop, pretrained, n
             model = Model(inputs=base_model.input, outputs=output)
     else: # rasta
         model = get_rasta_model(model_type, n_train, reg, alpha, init, drop)
+    if int(pretrained)==2:
+        WEIGHTS_PATH_NO_TOP = 'https://github.com/qubvel/classification_models/releases/download/0.0.1/resnet50_imagenet_11586_no_top.h5'
+        weights_path = get_file('resnet50_imagenet_11586_no_top.h5',#'resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                                WEIGHTS_PATH_NO_TOP,
+                                cache_subdir='models',
+                                md5_hash='a268eb855778b3df3c7506639542a6af')
+        model.load_weights(weights_path,by_name=True)
     return model, data_type
 
 def copy_range(old_model, new_model, ran):
@@ -348,7 +379,7 @@ def save_summary(dir_path, name, model):
 
 def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
     if function == 'vgg16' or function == 'resnet50':
-        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
+        datagen = ImageDataGenerator(width_shift_range=.15, height_shift_range=.15, horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
     elif re.search('auto*', function):
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=id_preprocess_input)
     else:

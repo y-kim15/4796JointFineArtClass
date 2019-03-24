@@ -17,6 +17,7 @@ import re
 from collections import Counter
 import sys, csv
 import pkgutil
+from collections import OrderedDict
 config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allocator_type = 'BFC'
 config.gpu_options.per_process_gpu_memory_fraction = 0.40
@@ -37,7 +38,7 @@ parser.add_argument('-t', action="store", default='empty', dest='train_type', he
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
 parser.add_argument('--new_p', action="store", dest='new_path', help='Save in a new directory')
 parser.add_argument('--model_type', action='store', dest='model_type', help='Type of model [auto1|auto2|vgg16|inceptionv3|resnet50]')
-parser.add_argument('--rasta_model', action='store', dest='rasta_model', help='Type of rasta models [resnet_dropout|cust_resnet|custom_resnet')
+parser.add_argument('--rasta_model', action='store', dest='rasta_model', help='Type of rasta models [alexnet_empty|custom_resnet')
 parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
@@ -50,10 +51,10 @@ parser.add_argument('--decay', action="store", default='none', dest='add_decay',
 parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
 parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for Regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
-parser.add_argument('--init', action="store", default='glorot_uniform', dest='add_init', help='Define type of Initialiser')
-parser.add_argument('--mom', action="store", default=0.0, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
+parser.add_argument('--init', action="store", dest='add_init', help='Define type of Initialiser')
+parser.add_argument('--mom', action="store", default=0.9, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
 parser.add_argument('-ln', action="store", default=None, dest='rep_layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
-parser.add_argument('-tr', action="store_true", default=False, dest='pretrained', help="Get pretrained model")
+parser.add_argument('-tr', action="store", type=int, default=1, choices=[0,1,2], dest='pretrained', help="Get pretrained model [0:None, 1: keras, 2: classification_models]")
 parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train_hyp case')
 parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanaced data')
 
@@ -66,6 +67,7 @@ try:
         MODEL_TYPE = args.model_type
     elif args.rasta_model is not None:
         MODEL_TYPE = args.rasta_model
+        print("Warning: chosen model type is rasta, training type -t is ignored.")
     else:
         raise ValueError()
 except ValueError:
@@ -116,7 +118,7 @@ if train_type != 'empty':
     print("no of layers : ", len(model.layers))
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
     if train_type == 'tune':
-        new_model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.init, args.add_drop, args.pretrained, N_TUNE)
+        new_model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_init, args.add_drop, args.pretrained, N_TUNE)
         if args.rep_layer_no!= None:
             # give this value 0 if you want to copy the whole model to the new with end weights
             if args.rep_layer_no.isdigit() and int(args.rep_layer_no) ==0:
@@ -137,7 +139,7 @@ else:
     #MODEL_TYPE = args.model_type
     print("MODEL TYPE IS ", MODEL_TYPE)
     MODEL_PATH = None
-    model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_drop, args.pretrained, N_TUNE)
+    model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_init, args.add_drop, args.pretrained, N_TUNE)
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, n_tune=N_TUNE)
     if args.path != "":
         dir_path = args.path
@@ -152,21 +154,17 @@ if  args.rasta_model=='cust_resnet':
     model, changed = set_trainable_layers(model, N_TUNE)
 
 params = vars(args)
-
 train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE[0], INPUT_SHAPE[1]),
                                 horizontal_flip=flip, train_type=DATA_TYPE, function=MODEL_TYPE)
 WEIGHTS = None
 if args.add_wei:
    counter = Counter(train_generator.classes)
-   max_val = float(max(counter.values()))
-   class_weights = {class_id: max_val / num_images for class_id, num_images in counter.items()}
+   #max_val = float(max(counter.values()))
+   #class_weights = {class_id: max_val / num_images for class_id, num_images in counter.items()}
+   class_weights = {class_id: 1.0 / num_images for class_id, num_images in counter.items()}
    WEIGHTS = class_weights
 
-try:
-    model = multi_gpu_model(model)
-    print("multi gpu enabled")
-except:
-    pass
+
 
 print("Total number of layers is ", str(len(model.layers)))
 
@@ -202,11 +200,11 @@ if VAL_PATH != None:
     else:
         if args.path != "":
             add = name + "-"
-        checkpoint = ModelCheckpoint(join(dir_path, add+"{epoch:02d}-{val_acc:.3f}.hdf5"), monitor='val_acc',
-                                     verbose=1, save_best_only=True, mode='max')
-        callbacks = [tb, earlyStop]
-        if args.path == "":
-            callbacks.append(checkpoint)
+        checkpoint = ModelCheckpoint(join(dir_path, add+"{epoch:02d}-{val_acc:.3f}-{val_loss:.3f}.hdf5"), monitor='val_loss',
+                                     verbose=1, save_best_only=True, mode='min')
+        callbacks = [tb, earlyStop, checkpoint]
+        #if args.path == "":
+        #    callbacks.append(checkpoint)
         if not DECAY.isdigit() or DECAY != None or DECAY != 'rate':
             if DECAY == 'step':
                 decay_rate = 0.5
@@ -238,6 +236,7 @@ else:
     extra = extra1
 orig = vars(args)
 orig['path'] = dir_path + '/' + name
+data = OrderedDict()
 data = merge_two_dicts(orig, extra)
 with open(join(dir_path, add + '_history.pck'), 'wb') as f:
     pickle.dump(history.history, f)

@@ -1,5 +1,5 @@
 from processing.clean_csv import create_dir
-from processing.train_utils import merge_two_dicts, get_best_comb_from_csv
+from processing.train_utils import merge_two_dicts, get_best_comb_from_csv, save_ordered
 import os
 from os.path import join
 import datetime
@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(description='Description')
 parser.add_argument('-t', action="store", default="params", dest='type', help='Type of Training [params|series]')
 parser.add_argument('-j', action="store", default=None, dest='json_file', help='Path to json file containing parameter values')
 parser.add_argument('-s', action="store_true",default=False, dest='save', help='Save the output in directory') #if false, will only report the best on cmd line and json
-parser.add_argument('-m', action="store", default="resnet50", dest='model', help='Name of architecture to use [vgg16|inceptionv3|resnet50]')
+parser.add_argument('-m', action="store", dest='model', help='Name of architecture to use [vgg16|inceptionv3|resnet50]')
 args = parser.parse_args()
 TYPE = args.type
 if TYPE == 'params':
@@ -55,8 +55,11 @@ if TYPE == 'params':
         path = []
 
     command = []
-    MODEL = args.model
-    command += ["python", "train.py", "--model_type", MODEL]
+    command += ["python", "train.py"]
+    if args.model is not None:
+        MODEL = args.model
+        command += ["--model_type", MODEL]
+
     if args.json_file != None:
         JSON_PATH = args.json_file
         params = {}
@@ -92,9 +95,9 @@ if TYPE == 'params':
             for k, v in zip(lists.keys(), comb):
                 cmd += [k, str(v)]
             cmd += path
-            cmd += ["-tr"]
+            cmd += ["-tr", "1"]
             print("print command: \n", cmd)
-            #subprocess.call(command)
+            subprocess.call(cmd)
     else:
         print("print command just one: \n", command)
         subprocess.call(command)
@@ -103,7 +106,8 @@ if TYPE == 'params':
 #get_best_comb_from_csv(csv_path, params,
     if args.save:
         csv_path = join(FINAL_PATH, "_output.csv")
-        get_best_comb_from_csv(csv_path, params.keys(), save=True)
+        sorted = save_ordered(csv_path)
+        get_best_comb_from_csv(csv_path, sorted, params.keys(), save=True)
 #TODO:
 # return conduct a series of training by reloading the model trained previously
 else:
@@ -144,9 +148,4 @@ for b in batch_size:
 
     i += 1
 
-print("time elapsed: ", time.time() - start)
-'''
-#for opt in opts:
-
-# method to get values from created csv file (_output.csv) in FINAL_PATH one giving highest val acc
-# method to call evaluate to get highest test acc
+print("time elapsed: ", time.time() - start)'''
