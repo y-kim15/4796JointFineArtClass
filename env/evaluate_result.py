@@ -1,6 +1,6 @@
 from keras.models import load_model, Model
 from keras.preprocessing.image import load_img, img_to_array
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, roc_curve, auc
 import matplotlib
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
@@ -48,7 +48,7 @@ parser.add_argument('--his', action="store", dest='plot_his', help='Plot history
 parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot (extension pck)')
 parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Mandatory to call --his')
 parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer (layer name or index)')
-# parser.add_argument('-ln', action="store", type=int, dest='layer_no', help='Select the layer to replace')
+parser.add_argument('--roc', action="store_true", dest='get_roc', help='Get Roc Curve')
 args = parser.parse_args()
 
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
@@ -181,6 +181,116 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         plt.show()
     print(cm)
     return orig_cm
+
+# Finds the optimal cut-off point which returns the optimal true positive rate with
+# minimal false positive rate. This is then plotted on graph.
+def find_opt_threshold(fprs, tprs):
+    current = (fprs[0], tprs[0])
+    distance = -1
+    for i in range(len(fprs)):
+        dis = math.sqrt(((1-tprs[i])**2 + fprs[i]**2))
+        if distance == -1 or (distance > dis and dis > 0) :
+            distance = dis
+            current = (fprs[i], tprs[i])
+    return current
+
+
+def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
+    k = 1
+    nSamples = len(y_true)
+    dico = get_dico()
+    classes = [str(x) for x in list(dico.keys())]
+    # Computes ROC curve and area for each class
+    rocAuc = dict()
+    fpr = dict()
+    tpr = dict()
+    for i in range(classes.shape[0]):
+        tprs = []
+        meanFpr = np.linspace(0, 1, nSamples)
+        # Computes by k fold cross validation where length of self.values_ denotes value of k
+        for j in range(k):
+            jFpr, jTpr, _ = roc_curve(y_true[j][:, i], y_pred[j][:, i])
+            tprs.append(interp(meanFpr, jFpr, jTpr))
+            tprs[-1][0] = 0.
+
+        meanTpr = np.mean(tprs, axis=0)
+        meanTpr[-1] = 1.0
+        rocAuc[i] = dict()
+        rocAuc[i]["area"] = round(auc(meanFpr, meanTpr), 2)
+        fpr[i] = meanFpr
+        tpr[i] = meanTpr
+        optFpr, optTpr = find_opt_threshold(fpr[i], tpr[i])
+        rocAuc[i]["optimal"] =  [("fpr", round(optFpr, 2)), ("tpr", round(optTpr, 2))]
+    find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc)
+    find_macro(fpr, tpr, rocAuc, classes)
+
+    name = None
+    if save:
+        name = kwargs['name']
+    show_roc_curve(fpr, tpr, rocAuc, classes, name, path, show=show)
+    return rocAuc
+
+def find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc):
+    # Computes micro-average ROC curve and area
+    tprsMicro = []
+    meanFpr = np.linspace(0, 1, nSamples)
+    for j in range(k):
+        fprMicro, tprMicro, _ = roc_curve(y_true[j].ravel(), y_pred[j].ravel())
+        tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
+        tprsMicro[-1][0] = 0.
+    meanTprMicro = np.mean(tprsMicro, axis=0)
+    meanTprMicro[-1] = 1.0
+    fpr["micro"] = meanFpr
+    tpr["micro"] = meanTprMicro
+    rocAuc["micro"] = round(auc(meanFpr, meanTprMicro), 2)
+
+def find_macro(fpr, tpr, rocAuc, classes):
+    # Computes macro-average ROC curve and area
+    allFpr = np.unique(np.concatenate([fpr[i] for i in range(classes.shape[0])]))
+    meanTpr = np.zeros_like(allFpr)
+    for i in range(classes.shape[0]):
+        meanTpr += interp(allFpr, fpr[i], tpr[i])
+    meanTpr /= classes.shape[0]
+
+    fpr["macro"] = allFpr
+    tpr["macro"] = meanTpr
+    rocAuc["macro"] = round(auc(fpr["macro"], tpr["macro"]), 2)
+
+
+def show_roc_curve(fpr, tpr, rocAuc, classes, name, path, show=False):
+    fig = plt.figure(figsize=[6, 4.5])
+    lw = 2
+    plt.plot(fpr["micro"], tpr["micro"],
+             label='micro-average ROC curve (area = {0:0.2f})'
+                   ''.format(rocAuc["micro"]), color='deeppink', linestyle=':', linewidth=4)
+    '''plt.plot(fpr["macro"], tpr["macro"],
+             label='macro-average ROC curve (area = {0:0.2f})'
+                   ''.format(rocAuc["macro"]),
+             color='navy', linestyle=':', linewidth=4)
+    colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'lawngreen', 'purple'
+    'dimgrey', 'gold', 'darkcyan', 'crimson', 'darkgreen'])
+    for i, color in zip(range(classes.shape[0]), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=lw,
+                 label='ROC curve of class {0} (area = {1:0.2f})'
+                       ''.format(i, rocAuc[i]["area"]))'''
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='grey',
+            alpha=.2)
+    plot_roc_grid('multi', name, path, fig, show=show)
+
+def plot_roc_grid(type, name, path, fig, show=False):
+    plt.xlabel('1 - Specificity')
+    plt.ylabel('Sensitivity')
+    plt.title('{0} - ROC Curve'.format(name))
+    plt.legend(loc='lower right', fontsize='small')
+    if name is not None:
+        plt.savefig(path + '/' + type + '_roc_' + name + '.svg', format = "svg")
+
+    if show:
+        if name==None:
+            name = 'roc_curve_example'
+        plt.show(fig)
+    else:
+        plt.close(fig)
 
 
 def get_rates(y_true, y_pred, cm):
@@ -471,6 +581,9 @@ def evaluate():
             get_classification_report(y_true, y_pred, classes, name, 'classification report: ' + name, show=SHOW,
                                       save=SAVE,
                                       path=SAVE_PATH)
+        if args.get_roc:
+            get_roc_curve(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+
     else:
         v = 5#K[0]
         pred, pcts = get_pred(MODEL_PATH, DATA_PATH, top_k=v)
