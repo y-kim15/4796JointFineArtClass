@@ -26,9 +26,7 @@ config.gpu_options.allow_growth = True
 PATH = os.path.dirname(__file__)
 
 # PARSING ARGUMENTS
-print(sys.path)
-search_path = ['.'] # set to None to see all modules importable from sys.path
-all_modules = [x[1] for x in pkgutil.iter_modules(path=search_path)]
+
 parser = argparse.ArgumentParser(description='Description')
 
 # TODO:
