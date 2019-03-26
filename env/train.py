@@ -41,7 +41,7 @@ parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
 parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
 parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable',help='Set the number of trainable layers, range [a-b] or [csv] or single value [x] for last x layers only')
-parser.add_argument('-dp', action="store", dest='data_path',help='Optional Full path to dataset')
+parser.add_argument('-dp', action="store", dest='data_path', default='lab', help='Optional Full path to dataset')
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 5), metavar='[0-4]', help='Sample Number to use [0-4]')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
@@ -58,7 +58,8 @@ parser.add_argument('-w', action="store_true", default=False, dest='add_wei', he
 
 args = parser.parse_args()
 print("Args: ", args)
-MODEL_DIR = "models/logs"
+if args.data_path is not None and args.data_path == 'lab':
+    MODEL_DIR = "/cs/tmp/yk30/models/logs"
 
 try:
     if args.model_type is not None:
@@ -146,7 +147,10 @@ else:
     if args.path != "":
         dir_path = args.path
     else:
-        dir_path = join("/cs/scratch/yk30/models",name)
+        if args.data_path == 'lab':
+            dir_path = join("/cs/tmp/yk30/models",name)
+        else:
+            dir_path = join("models", name)
 	#dir_path = join("models", name)
         create_dir(dir_path)
 
@@ -257,7 +261,7 @@ else:
         head = False
     FIELDNAMES = list(data.keys()).sort()
     with open(join(dir_path, '_output.csv'), 'a', newline='') as f:
-        w = csv.DictWriter(f, FIELDNAMES)
+        w = csv.DictWriter(f, iter(FIELDNAMES))
         if head:
             w.writeheader()
         w.writerow(row for row in zip(*(data[key] for key in FIELDNAMES)))

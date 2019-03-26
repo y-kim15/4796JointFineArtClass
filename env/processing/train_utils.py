@@ -4,7 +4,8 @@ from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform, VarianceScaling
 from keras.regularizers import l2
-from keras.preprocessing.image import ImageDataGenerator
+#from keras.preprocessing.image import ImageDataGenerator
+from processing.keras_image_ext import ImageDataGenerator
 from keras.constraints import MaxNorm
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, \
     GlobalAveragePooling2D, UpSampling2D, BatchNormalization, Activation, ZeroPadding2D, AveragePooling2D
@@ -13,6 +14,7 @@ from keras import backend as K
 from rasta.custom_resnets import *
 from rasta.alexnet import decaf,alexnet
 from contextlib import redirect_stdout
+import numpy as np
 import datetime
 import os
 from os.path import join
@@ -373,7 +375,19 @@ def save_summary(dir_path, name, model):
         with redirect_stdout(f):
             model.summary()
 
+def center_crop(x, center_crop_size, **kwargs):
+    centerw, centerh = x.shape[1]//2, x.shape[2]//2
+    halfw, halfh = center_crop_size[0]//2, center_crop_size[1]//2
+    return x[:, centerw-halfw:centerw+halfw,centerh-halfh:centerh+halfh]
 
+def random_crop(x, random_crop_size, sync_seed=None, **kwargs):
+    np.random.seed(sync_seed)
+    w, h = x.shape[1], x.shape[2]
+    rangew = (w - random_crop_size[0]) // 2
+    rangeh = (h - random_crop_size[1]) // 2
+    offsetw = 0 if rangew == 0 else np.random.randint(rangew)
+    offseth = 0 if rangeh == 0 else np.random.randint(rangeh)
+    return x[:, offsetw:offsetw+random_crop_size[0], offseth:offseth+random_crop_size[1]]
 
 
 
@@ -384,7 +398,17 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=id_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
+    datagen.config['random_crop_size'] = (224, 224)
+    datagen.config['center_crop_size'] = (224, 224)
+    datagen.set_pipeline([random_crop, center_crop])
+    dgdx = datagen.flow_from_directory(path, class_mode='categorical', batch_size=batch_size)
 
+    # you can now fit a generator as well
+    datagen.fit_generator(dgdx, nb_iter=10)
+
+    # here we sychronize two generator and combine it into one
+    generator = dgdx
+    '''
     if train_type:
         generator = datagen.flow_from_directory(
             path,
@@ -399,7 +423,7 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
             batch_size=batch_size,
             seed=0,
             class_mode='input')
-    print("total size : ", generator.n)
+    print("total size : ", generator.n)'''
     return generator
 
 
@@ -516,6 +540,7 @@ cmds= {
     "mom": "add_mom",
     "w": "add_wei"
 }
+
 def save_ordered(csv_path):
     data = pandas.read_csv(csv_path, encoding='utf-8-sig')
     headers = list(data[:0])
@@ -536,7 +561,7 @@ def get_best_comb_from_csv(csv_path, sorted, params, top=3, save=False):
         #r = sorted.iloc(i)
         dic = {}
         for p in params:
-            dic[p] = sorted.loc[i,cmds[p]]#.iloc(i)
+            dic[p] = sorted.loc[i, cmds[p]]#.iloc(i)
             if i == 0:
                 best += p + ": " + str(dic[p]) + "\n"
         dic["max_val_acc"] = round(sorted.loc[i,"max_val_acc"],4)#.iloc(i)
