@@ -13,13 +13,19 @@ from processing.read_images import count_files
 from os import listdir
 from os.path import join
 import numpy as np
-from bokeh.plotting import output_file
+from bokeh.plotting import figure, show, output_file
 import pandas as pd
 import argparse
+from processing.clean_csv import create_dir
 import os, json
 import pickle
-import csv
+import itertools
+import tensorflow as tf
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
+sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
+#"models/auto2_2-8-11-5_empty_layers-0-s-0/03-5931.456.hdf5"#
 MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
 IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_triumph-of-bacchus-and-ariadne-1602.jpg"
@@ -31,10 +37,10 @@ N_CLASSES = 25
 parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
-parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Validation Output and Save [path to csv to save]' )
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
+parser.add_argument('-dp', action="store_true", dest='lab', default=True, help="Set to test in lab", )
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -145,7 +151,7 @@ def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
         acc.append(out / max)
     for n, a in zip(k, acc):
         print("Top-{} accuracy: {}%".format(n, a * 100))
-    return one_pred, one_true, k, acc
+    return one_pred, one_true
 
 
 def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwargs):  # output of get_y_prediction
@@ -549,29 +555,18 @@ def get_dico():
 def invert_dico(dico):
     return {v: k for k, v in dico.items()}
 
-def write_to_csv(path, data, type):
-    FIELDNAMES = list(data.keys()).sort()
-    with open(join(path, '_'+type+'.csv'), 'a+', newline='') as f:
-        lines = f.readlines()
-        l = len(lines)
-        head = True
-        if l > 1:
-            head = False
-        w = csv.DictWriter(f, FIELDNAMES)
-        if head:
-            w.writeheader()
-        w.writerow(row for row in zip(*(data[key] for key in FIELDNAMES)))
-
-
 def evaluate():
     MODEL_PATH = args.model_path
+    PRE_PATH = ''
+    if args.lab:
+        PRE_PATH = '/cs/tmp/yk30/'
     if args.data_path is not None:
         DATA_PATH = args.data_path
     else:
         if args.data_size is not None and args.data_size=='f':
-            DATA_PATH = "data/wikipaintings_full/wikipaintings_test"
+            DATA_PATH = PRE_PATH + "data/wikipaintings_full/wikipaintings_test"
         else:
-            DATA_PATH = "data/wikipaintings_small/wikipaintings_test"
+            DATA_PATH = PRE_PATH + "data/wikipaintings_small/wikipaintings_test"
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
     SAVE = args.save
@@ -582,7 +577,7 @@ def evaluate():
     else:
         SAVE_PATH = None
     if args.type == 'acc':
-        y_pred, y_true, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K)
+        y_pred, y_true = get_acc(MODEL_PATH, DATA_PATH, k=K)
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
         SHOW = args.show_g
 
@@ -596,11 +591,6 @@ def evaluate():
                                       path=SAVE_PATH)
         if args.get_roc:
             get_roc_curve(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
-        if args.cv:
-            csv_path = args.cv
-            dic = {(key, value) for (key, value) in zip(k, acc)}
-            write_to_csv(csv_path, dic,'cv')
-
 
     else:
         v = 5#K[0]
