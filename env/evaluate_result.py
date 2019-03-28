@@ -13,19 +13,15 @@ from processing.read_images import count_files
 from os import listdir
 from os.path import join
 import numpy as np
+from scipy import interp
 from bokeh.plotting import figure, show, output_file
 import pandas as pd
 import argparse
-from processing.clean_csv import create_dir
 import os, json
 import pickle
-import itertools
-import tensorflow as tf
-from tensorflow.python.client import device_lib
-print(device_lib.list_local_devices())
-sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+import csv
+import math
 
-#"models/auto2_2-8-11-5_empty_layers-0-s-0/03-5931.456.hdf5"#
 MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
 IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_triumph-of-bacchus-and-ariadne-1602.jpg"
@@ -37,6 +33,7 @@ N_CLASSES = 25
 parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
+parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Validation Output and Save [path to csv to save]' )
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
@@ -112,6 +109,7 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
     dico = get_dico()
     y_true = []
     y_pred = []
+    y_pred_k = []
     s = count_files(test_path)
     styles = listdir(test_path)
     print('Calculating predictions...')
@@ -121,21 +119,28 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
         path = join(test_path, style)
         label = dico.get(style)
         imgs = listdir(path)
+        y_t = []
+        y_p = []
         for name in imgs:
             img = load_img(join(path, name), target_size=target_size)
             x = img_to_array(img)
             x = wp_preprocess_input(x)
             pred = model.predict(x[np.newaxis, ...])
             args_sorted = np.argsort(pred)[0][::-1]
-            y_true.append(label)
-            y_pred.append([a for a in args_sorted[:top_k]])
+            y_t.append(label)
+            y_p.append([a for a in args_sorted[:top_k]])
+            y_pred_k.append([a for a in args_sorted[:top_k]])
             i += 1
             bar.update(i)
-    return y_true, np.asarray(y_pred)
+        y_true.append(y_t)
+        y_pred.append(y_p)
+    return y_true, y_pred, np.asarray(y_pred_k) #np.asarray(y_pred)
 
 
 def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
-    y_true, y_pred = get_y_prediction(model_path, test_path, k[2], target_size)
+    y_t, _ ,y_pred = get_y_prediction(model_path, test_path, k[2], target_size)
+    y_true = [j for sub in y_t for j in sub]
+    #y_pred = [j for sub in y_p for j in sub]
     acc = []
     one_true = None
     one_pred = None
@@ -151,7 +156,8 @@ def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
         acc.append(out / max)
     for n, a in zip(k, acc):
         print("Top-{} accuracy: {}%".format(n, a * 100))
-    return one_pred, one_true
+    y_p = [x[0] for x in y_pred]
+    return y_t, y_p, one_true, one_pred, k, acc
 
 
 def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwargs):  # output of get_y_prediction
@@ -209,14 +215,18 @@ def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
     rocAuc = dict()
     fpr = dict()
     tpr = dict()
-    for i in range(classes.shape[0]):
+    #print("shape of y_true ", str(y_true.shape), " shape of y_pred ", str(y_pred.shape))
+    for i in range(len(classes)):
         tprs = []
         meanFpr = np.linspace(0, 1, nSamples)
         # Computes by k fold cross validation where length of self.values_ denotes value of k
-        for j in range(k):
-            jFpr, jTpr, _ = roc_curve(y_true[j][:, i], y_pred[j][:, i])
-            tprs.append(interp(meanFpr, jFpr, jTpr))
-            tprs[-1][0] = 0.
+        jFpr, jTpr, _ = roc_curve(y_true[:,i], y_pred[:,i])
+        tprs.append(interp(meanFpr, jFpr, jTpr))
+        tprs[-1][0] = 0.
+        # for j in range(k):
+        #     jFpr, jTpr, _ = roc_curve(y_true[j][:, i], y_pred[j][:, i])
+        #     tprs.append(interp(meanFpr, jFpr, jTpr))
+        #     tprs[-1][0] = 0.
 
         meanTpr = np.mean(tprs, axis=0)
         meanTpr[-1] = 1.0
@@ -239,10 +249,13 @@ def find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc):
     # Computes micro-average ROC curve and area
     tprsMicro = []
     meanFpr = np.linspace(0, 1, nSamples)
-    for j in range(k):
-        fprMicro, tprMicro, _ = roc_curve(y_true[j].ravel(), y_pred[j].ravel())
-        tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
-        tprsMicro[-1][0] = 0.
+    fprMicro, tprMicro, _ = roc_curve(y_true, y_pred)
+    tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
+    tprsMicro[-1][0] = 0.
+    # for j in range(k):
+    #     fprMicro, tprMicro, _ = roc_curve(y_true[j].ravel(), y_pred[j].ravel())
+    #     tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
+    #     tprsMicro[-1][0] = 0.
     meanTprMicro = np.mean(tprsMicro, axis=0)
     meanTprMicro[-1] = 1.0
     fpr["micro"] = meanFpr
@@ -266,12 +279,13 @@ def show_roc_curve(fpr, tpr, rocAuc, classes, name, path, show=False):
     fig = plt.figure(figsize=[6, 4.5])
     lw = 2
     plt.plot(fpr["micro"], tpr["micro"],
-             label='micro-average ROC curve (area = {0:0.2f})'
+             label='micro-average ROC curve (area = {0:0.3f})'
                    ''.format(rocAuc["micro"]), color='deeppink', linestyle=':', linewidth=4)
-    '''plt.plot(fpr["macro"], tpr["macro"],
+    plt.plot(fpr["macro"], tpr["macro"],
              label='macro-average ROC curve (area = {0:0.2f})'
                    ''.format(rocAuc["macro"]),
              color='navy', linestyle=':', linewidth=4)
+    '''
     colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'lawngreen', 'purple'
     'dimgrey', 'gold', 'darkcyan', 'crimson', 'darkgreen'])
     for i, color in zip(range(classes.shape[0]), colors):
@@ -555,6 +569,20 @@ def get_dico():
 def invert_dico(dico):
     return {v: k for k, v in dico.items()}
 
+def write_to_csv(path, data, type):
+    FIELDNAMES = list(data.keys()).sort()
+    with open(join(path, '_'+type+'.csv'), 'a+', newline='') as f:
+        lines = f.readlines()
+        l = len(lines)
+        head = True
+        if l > 1:
+            head = False
+        w = csv.DictWriter(f, FIELDNAMES)
+        if head:
+            w.writeheader()
+        w.writerow(row for row in zip(*(data[key] for key in FIELDNAMES)))
+
+
 def evaluate():
     MODEL_PATH = args.model_path
     PRE_PATH = ''
@@ -577,7 +605,7 @@ def evaluate():
     else:
         SAVE_PATH = None
     if args.type == 'acc':
-        y_pred, y_true = get_acc(MODEL_PATH, DATA_PATH, k=K)
+        y_t, y_p, y_true, y_pred, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K)
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
         SHOW = args.show_g
 
@@ -590,7 +618,12 @@ def evaluate():
                                       save=SAVE,
                                       path=SAVE_PATH)
         if args.get_roc:
-            get_roc_curve(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+            get_roc_curve(y_t, y_p, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+        if args.cv:
+            csv_path = args.cv
+            dic = {(key, value) for (key, value) in zip(k, acc)}
+            write_to_csv(csv_path, dic,'cv')
+
 
     else:
         v = 5#K[0]

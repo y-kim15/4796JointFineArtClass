@@ -123,7 +123,7 @@ else:
     for i in range(args.cv):
         print("Fold " + str(i+1) + "....")
         train_path = make_sub_train(i)
-        test_path = "data/wiki_small_2" + str(i)
+        test_path = join('data', 'wiki_small_2_' + str(i), 'small_train')
         sub_dir = join(FINAL_PATH, 'train_' + str(i))
         os.mkdir(sub_dir)
         # execute

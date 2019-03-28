@@ -4,10 +4,9 @@ from os.path import join
 import argparse
 import time
 import pickle, json
-from keras.models import Sequential, Model, load_model
-from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
+from keras.models import load_model
+from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
 from keras.regularizers import l1, l2
-from keras.utils import multi_gpu_model
 from processing.train_utils import get_model_name, get_new_model, save_summary, get_generator, step_decay, \
     get_optimiser, exp_decay, copy_weights, fixed_generator, set_trainable_layers, merge_two_dicts, lr_decay_callback,lr_decay_callback2
 from processing.clean_csv import create_dir
@@ -32,7 +31,7 @@ parser = argparse.ArgumentParser(description='Description')
 # TODO:
 # upload wiki small dataset sep later on
 #default="/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train!/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
-parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
+parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune|hyp]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
 parser.add_argument('--new_p', action="store", dest='new_path', help='Save in a new directory')
 parser.add_argument('--model_type', action='store', dest='model_type', help='Type of model [auto1|auto2|vgg16|inceptionv3|resnet50]')
@@ -123,7 +122,7 @@ if train_type != 'empty':
         new_model, DATA_TYPE = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_init, args.add_drop, args.pretrained, N_TUNE)
         if args.rep_layer_no!= None:
             # give this value 0 if you want to copy the whole model to the new with end weights
-            if args.rep_layer_no.isdigit() and int(args.rep_layer_no) ==0:
+            if args.rep_layer_no.isdigit() and int(args.rep_layer_no) == 0:
                 model = model.load_weights(join(MODEL_PATH.rsplit('/',1)[0], '_end_weights.h5'))
             else:
                 model = copy_weights(model, new_model, args.rep_layer_no)
