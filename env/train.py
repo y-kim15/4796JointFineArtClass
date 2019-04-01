@@ -23,7 +23,7 @@ config.gpu_options.allow_growth = True
 
 PATH = os.path.dirname(__file__)
 lab = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train!/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
-lap = "data/wikipaintings_full/wikipaintings_train!data/wikipaintings_full/wikipaintings_val"
+lap = "data/wikipaintings_full2/wikipaintings_train!data/wikipaintings_full2/wikipaintings_val"
 # PARSING ARGUMENTS
 
 parser = argparse.ArgumentParser(description='Description')
@@ -123,7 +123,7 @@ if train_type != 'empty':
         if args.rep_layer_no!= None:
             # give this value 0 if you want to copy the whole model to the new with end weights
             if args.rep_layer_no.isdigit() and int(args.rep_layer_no) == 0:
-                model = model.load_weights(join(MODEL_PATH.rsplit('/',1)[0], '_end_weights.h5'))
+                model.load_weights(join(MODEL_PATH.rsplit('/',1)[0], '_end_weights.h5'))
             else:
                 model = copy_weights(model, new_model, args.rep_layer_no)
             if model == None:
@@ -211,7 +211,7 @@ if VAL_PATH != None:
                 decay_rate = 0.5
                 lr_decay = lr_decay_callback(LR, decay_rate)
                 #lr_decay = LearningRateScheduler(step_decay)
-            else:
+            else:  # exp?
                 decay_rate = 0.1
                 lr_decay = lr_decay_callback2(LR, decay_rate)
                 #lr_decay = LearningRateScheduler(exp_decay)
@@ -239,7 +239,7 @@ orig = vars(args)
 orig['path'] = dir_path + '/' + name
 data = OrderedDict()
 data = merge_two_dicts(orig, extra)
-with open(join(dir_path, add + '_history.pck'), 'wb') as f:
+with open(join(dir_path, '_history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()
 if args.path == "":
@@ -254,7 +254,7 @@ else:
         head = True
     else:
         head = False
-    FIELDNAMES = list(data.keys()).sort()
+    FIELDNAMES = sorted(list(data.keys()))
     with open(join(dir_path, '_output.csv'), 'a', newline='') as f:
         w = csv.DictWriter(f, FIELDNAMES)
         if head:
