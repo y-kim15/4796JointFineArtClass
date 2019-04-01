@@ -22,6 +22,7 @@ config.gpu_options.per_process_gpu_memory_fraction = 0.40
 config.gpu_options.allow_growth = True
 
 PATH = os.path.dirname(__file__)
+# options for data path
 lab = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train!/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
 lap = "data/wikipaintings_full2/wikipaintings_train!data/wikipaintings_full2/wikipaintings_val"
 # PARSING ARGUMENTS
