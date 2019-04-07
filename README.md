@@ -6,6 +6,10 @@
 To be run in GPU supported Scientific Linux lab clients
 Note that this automatically installs tensorflow-gpu
 
+### To download image files
+Image files for training was downloaded from Lecoutre et al. source of RASTA. Using their stored data:
+
+
 ### Model Training
 For all training, the average time taken for 1 epoch is 50 minutes.
 #### Train a new model
@@ -14,6 +18,9 @@ For all training, the average time taken for 1 epoch is 50 minutes.
     python3 train.py -t retrain --model_type <model_type> -m <model_path>
 #### Tune an existing model
     python3 train.py -t tune --model_type <model_type> -m <model_path> -n <n_tune> -ln <layers_to_copy>
+
+To view tensorboard for monitoring the training process use:
+    tensorboard --logdir <path>
 
 
 ````
@@ -59,7 +66,8 @@ optional arguments:
 deprecated:
   -d [0-4]              Sample Number to use [0-4] (previously used for small scale training)
 ````
-
+#### Example
+    python3 train.py --model_type vgg16 -tr 1 -e 3 -b 30 -n 3
 
 ### Model Evaluation
 #### Evaluate the accuracy of model
@@ -106,14 +114,6 @@ optional arguments:
   --act ACT             Visualise activation function of layer [layer name or
                         index]
   --roc                 Get Roc Curve
-```
-
-```python3
-parser.add_argument('--his', action="store", dest='plot_his', help='Plot history, choose which to plot [l|a|b (default)]')
-parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot (extension pck)')
-parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Mandatory to call --his')
-parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer (layer name or index)')
-parser.add_argument('--roc', action="store_true", dest='get_roc', help='Get Roc Curve')
 ```
 
 Note the below guideline is described for completeness only for cross validation as the implementation

@@ -198,8 +198,8 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
 
     plt.title("Confusion matrix")
     classNames = [str(x) for x in list(dico.keys())]
-    cm = pd.DataFrame(cm, columns=classNames, index=classNames, linewidths=.5)
-    sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
+    cm = pd.DataFrame(cm, columns=classNames, index=classNames)
+    sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues', linewidths=.5)
     #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
