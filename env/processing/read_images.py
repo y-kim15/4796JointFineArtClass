@@ -1,8 +1,7 @@
 import os
 import re
-import pandas
+import pandas as pd
 import csv
-from progressbar import ProgressBar
 from processing.clean_csv import Clean, create_dir
 import imageio
 import math
@@ -13,7 +12,6 @@ from shutil import copyfile,move, copy, rmtree
 import time
 
 N_CLASSES = 25
-
 
 
 def count_works(dict):
@@ -100,10 +98,6 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
     n_dest = int(round(1 / proportion))
     f.write("*********Summary by Directory*********\nProportion: " + str(proportion) + "\nNo dirs: " + str(n_dest) + "\n")
     f.close()
-    #s = count_files(large_path)
-    #print('Dividing to small dirs...')
-    #bar = ProgressBar(max_value=s)
-    #i = 0
     for i in range(n_dest):
         if exists(target_path + str(i)):
             rmtree(target_path + str(i))
@@ -120,11 +114,11 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
             to_path = join(target_path + str(i), dir_name)
             create_dir(to_path)
         vv = get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
-        #i += vv
-        #bar.update(i)
+
 
 
 def count_files(path):
+    # (FROM RASTA) count number of files present given directory path
     n = 0
     for t in list(os.walk(path)):
         n += len(t[2])
@@ -135,7 +129,7 @@ def get_image_matrix(file_path, id, col_name):
     # read train_data_small type file, find the row with matching id
     # get the image and return the matrix form of the image (np format)
     # col_name : col name of where the path exists
-    df = pandas.read_csv(file_path)
+    df = pd.read_csv(file_path)
     row = df.loc[df["id"] == str(id)]
     path = row[col_name]
     im = imageio.imread(path)
@@ -155,6 +149,7 @@ def enumerate_class_names(name, path):
     f.close()
 
 def get_image_details(file_name):
+    # divide up file name to artist, title and date
     splits = file_name.split('_')
     artist = splits[0]
     date = ''
@@ -187,7 +182,7 @@ def generate_image_id_file(name, path, class_file_path, id=True):
         headers = ["agent_display", "date_display", "title_display", "label", "path"]
     else:
         headers = ["id_agent", "id_count", "agent_display", "date_display", "title_display", "label", "class", "path"]
-    new_f = pandas.DataFrame(columns=headers)
+    new_f = pd.DataFrame(columns=headers)
 
     upper_dirs = sorted(os.listdir(path))
     for middle in upper_dirs:
@@ -214,6 +209,7 @@ def generate_image_id_file(name, path, class_file_path, id=True):
 
 
 def shuffle_data(train_path, new_path):
+    # shuffles image entries and write the reordered in the new path
     with open(train_path, 'r') as source:
         data = [(random.random(), line) for line in source]
         data.sort()
@@ -221,8 +217,9 @@ def shuffle_data(train_path, new_path):
         for _, line in data:
             target.write(line)
 
-# creates file system where images are grouped by artist dir
+
 def generate_artist_file_system(path, dest_path):
+    # creates file system where images are grouped by artist dir
     if exists(dest_path):
         rmtree(dest_path)
     os.mkdir(dest_path)
@@ -238,12 +235,13 @@ def generate_artist_file_system(path, dest_path):
                 current_item_path = join(path, mid_dir, dir, item)
                 new_name = item.split('_')[0]
                 if not new_name in dest_files:
-                    os.mkdir(join(dest_path, new_name))  # dest_mid_dir, new_name))
+                    os.mkdir(join(dest_path, new_name))
                 copy(current_item_path,
-                            join(dest_path, new_name, item))  # dest_mid_dir, new_name, item))
-    print("File system created under data")
+                            join(dest_path, new_name, item))
+
 
 def get_artist_info(train_path):
+    # creates log of works grouped by artists
     dict = {}
     styles = os.listdir(train_path)
     for s in styles:
@@ -261,9 +259,10 @@ def get_artist_info(train_path):
         writer.writerows(zip(*[dict[key] for key in keys]))
 
 
-DIR_PATH = 'C:/Users/Kira Kim/Documents/cs4796'#os.path.dirname(os.path.realpath(__file__))
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 # methods applied existing functions from rasta.python.utils.utils
 
+# (FROM RASTA) split the full set to train and test
 def split_test_training(ratio_test=0.1, name='medium'):
     FULL_PATH = join(DIR_PATH,'data/id_database_' + name)
     TRAIN_PATH = join(DIR_PATH, 'data',  name + '_train')
@@ -287,6 +286,7 @@ def split_test_training(ratio_test=0.1, name='medium'):
         DEST_PATH = join(TEST_PATH, f)
         copyfile(SRC_PATH, DEST_PATH)
 
+# (FROM RASTA) split the full set to train and val
 def split_val_training(ratio_val=0.1, name='medium'):
     TRAIN_PATH = join(DIR_PATH, 'data',  name + '_train')
     VAL_PATH = join(DIR_PATH, 'data',  name + '_val')
@@ -302,14 +302,9 @@ def split_val_training(ratio_val=0.1, name='medium'):
         DEST_PATH = join(VAL_PATH, f)
         move(SRC_PATH, DEST_PATH)
 
-def count_files(dir_path):
-    n = 0
-    for t in list(os.walk(dir_path)):
-        n += len(t[2])
-    return n
 
 if __name__ == '__main__':
-    # path = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_train"
+    # example usage
     """path = "../rasta/data/wikipaintings_full/wikipaintings_train"
     class_path = "../data/wikipaintings_class_labels.txt"
     #enumerate_class_names(class_path,path)
@@ -319,8 +314,8 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    path = "/cs/tmp/yk30/data/wikipaintings_full"
-    dest_path = "/cs/tmp/yk30/data/wiki_small_2_"
+    path = join(DIR_PATH, 'data', 'wikipaintings_full')
+    dest_path = join(DIR_PATH, 'data', 'wiki_small_')
     cur_time = time.strftime("%d%m%y_%H%M_for_cv")
     get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
     #class_path = "../data/wikipaintings_class_labels.txt"
@@ -328,33 +323,3 @@ if __name__ == '__main__':
     #print(DIR_PATH)
     #split_test_training()
     #split_val_training()
-    '''import numpy as np
-    from keras.preprocessing.image import load_img
-    DATA_PATH = join(DIR_PATH,'data/medium_train')
-    s = np.array([0.,0.,0.])
-    t=0
-    for file in os.listdir(DATA_PATH):
-        x = load_img(join(DATA_PATH, file), target_size=(224, 224))
-        s += np.mean(x, axis=(0, 1))
-        t += 1
-
-    mean = s/t
-    print(mean)'''
-
-    print(mean)'''
-    PATH = "../data/wikiart/wikiart"
-    dirs = os.listdir(PATH)
-    f = open("../wikiart_sum.csv", "w+")
-    f.write("Style,Count\n")
-    for dir in dirs:
-        f.write(dir + "," + str(count_files(join(PATH, dir))) + "\n")
-    f.close()
-    # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
-    # val_file_name = "val.txt"
-    # generate_image_id_file(val_file_name, path_val, name)
-    # path = "./wikipaintings_small"
-    # dest_path = "./data/wikipaintings_artist"
-
-    # path = "../../../../scratch/yk30/wikipaintings_full"
-    # dest_path = "../../../../scratch/yk30/wikipaintings_full_artist"
-    # generate_artist_file_system(path, dest_path)

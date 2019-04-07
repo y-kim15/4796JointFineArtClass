@@ -19,15 +19,12 @@ import numpy as np
 from scipy import interp
 from bokeh.plotting import figure, show, output_file
 import pandas as pd
-import argparse
-import os, json
-import pickle
-import csv
-import math
+import os, json, pickle, csv, math, argparse
+
 
 MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-IMG_PATH = "data/wikipaintings_full/wikipaintings_test/Baroque/annibale-carracci_triumph-of-bacchus-and-ariadne-1602.jpg"
+IMG_PATH = "data/van-gogh_sunflowers.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
 DEFAULT_SAVE_PATH = "models/eval"
@@ -40,7 +37,7 @@ parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Valid
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
-parser.add_argument('-dp', action="store_true", dest='lab', help="Set to test in lab", )
+parser.add_argument('-dp', action="store_true", dest='lab', help="Set to test in lab")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -52,17 +49,16 @@ parser.add_argument('--save', action="store", default=DEFAULT_SAVE_PATH, dest='s
 parser.add_argument('--his', action="store", dest='plot_his', help='Plot history, choose which to plot [l|a|b (default)]')
 parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot (extension pck)')
 parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Mandatory to call --his')
-parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer (layer name or index)')
+parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer [layer name or index]')
 parser.add_argument('--roc', action="store_true", dest='get_roc', help='Get Roc Curve')
 args = parser.parse_args()
 
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
-
-
-def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_size=(4,4), **kwargs):
+# Generates activation map of filters in convolutional name 'layer_no' which can be given by
+# index or by layer name
+def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_size=(5,4), **kwargs):
     plot_size = (4,4)
     # target size is the size of the image to load in
-    # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
     model = load_model(model_path)
 
     outputs = [layer.output for layer in model.layers]
@@ -71,14 +67,13 @@ def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_si
     act_model = Model(inputs=model.input, outputs=outputs)
     img = load_img(img_path, target_size=target_size)
     x = img_to_array(img)
-    print("shape of x ", x.shape)
-    if 'vgg16' or 'resnet50' in model_path:
+
+    if 'vgg16' or 'resnet50' or 'inceptionv3' in model_path:
         x = imagenet_preprocess_input(x)
     else:
         x = wp_preprocess_input(x)
-    print("shape of x ", x.shape)
+
     new_x = x[np.newaxis,:,:,:]
-    print("new shape of x ", x.shape)
     activations = act_model.predict(new_x, batch_size=1)
     index = None
     if layer_no.isdigit() or isinstance(layer_no, int):
@@ -91,14 +86,8 @@ def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_si
                 break
     act = activations[index]
     i = 0
-    #print("original")
-    #plt.imshow(img)
-    print("plotsize 0, ", plot_size[0])
-    print("plotsize 1, ", plot_size[1])
-    #f = plt.figure(figsize=(plot_size[0]*2.5, plot_size[1]*1.5))
-    #ax = f.add_subplot(plot_size[0], plot_size[1], pow(plot_size[0],2), )
+
     f, ax = plt.subplots(plot_size[0], plot_size[1], squeeze=False)
-    #fig, ax = plt.subplot(plot_size[0], plot_size[1], pow(plot_size[0],2), figsize=(plot_size[0] * 2.5, plot_size[1] * 1.5))
     for r in range(0, plot_size[0]):
         for c in range(0, plot_size[1]):
             ax[r][c].imshow(act[0, :, :, i])
@@ -112,7 +101,10 @@ def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_si
     if show:
         plt.show()
 
-
+# (FROM RATSA) modified, given the test directory path, make predictions and collect
+# top-k probabilities to be converted to string labels
+# if model is weights only it uses default architecture for new model instance and load the
+# weights
 def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
     try:
         model = load_model(model_path)
@@ -146,19 +138,18 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
             y_t.append(label)
             # use y_p to store original probability scores (on hold)
             y_pred.append(pred)
-            #y_p.append(np.asarray(pred))
+
             y_pred_k.append([a for a in args_sorted[:top_k]])
             i += 1
             bar.update(i)
         y_true.append(y_t)
-       # y_pred.append(y_p)
-    return y_true, y_pred, np.asarray(y_pred_k) #np.asarray(y_pred)
+    return y_true, y_pred, np.asarray(y_pred_k)
 
 
-def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
+# (FROM RASTA) calculates accuracy and outputs
+def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224), save=False, **kwargs):
     y_t, y_p ,y_pred = get_y_prediction(model_path, test_path, k[2], target_size)
     y_true = [j for sub in y_t for j in sub]
-    #y_pred = [j for sub in y_p for j in sub]
     acc = []
     one_true = None
     one_pred = None
@@ -172,12 +163,25 @@ def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
             if v in preds:
                 out += 1
         acc.append(out / max)
+    if save:
+        save_dict = {}
+        if 'path' in kwargs:
+            path = kwargs['path']
+        if 'name' in kwargs:
+            name = kwargs['name']
+            save_dict['name'] = name
+        save_dict['k'] = k
     for n, a in zip(k, acc):
         print("Top-{} accuracy: {}%".format(n, a * 100))
-    #y_p = [x[0] for x in y_pred]
+        if save:
+            save_dict[str(n)] = str(a*100)
+    if save:
+        with open(join(path.rsplit('/', 1)[0], name + '-accuracy-output' + '.json'), 'w') as f:
+            json.dump(save_dict, f)
     return y_t, y_p, one_true, one_pred, k, acc
 
 
+# (FROM CS3099 ML7) computes confusion matrix
 def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwargs):  # output of get_y_prediction
     dico = get_dico()
     cm = confusion_matrix(y_true, y_pred)
@@ -187,14 +191,12 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     if normalise:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         fmt = '.2f'
-        # sns.heatmap(cm, annot=True, fmt=".1f", cmap='Blues', linewidths=.5)
     else:
         fmt = 'd'
-        # sns.heatmap(cm, annot=True, fmt="d", cmap='Blues', linewidths=.5)
 
     plt.title("Confusion matrix")
     classNames = [str(x) for x in list(dico.keys())]
-    cm = pd.DataFrame(cm, columns=classNames, index=classNames)
+    cm = pd.DataFrame(cm, columns=classNames, index=classNames, linewidths=.5)
     sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
     #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     plt.ylabel('True label')
@@ -211,7 +213,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         plt.show()
     return orig_cm
 
-# Finds the optimal cut-off point which returns the optimal true positive rate with
+# (FROM CS3099 ML7) Finds the optimal cut-off point which returns the optimal true positive rate with
 # minimal false positive rate. This is then plotted on graph.
 def find_opt_threshold(fprs, tprs):
     current = (fprs[0], tprs[0])
@@ -223,11 +225,14 @@ def find_opt_threshold(fprs, tprs):
             current = (fprs[i], tprs[i])
     return current
 
+# (FROM CS3099 ML7) Binarise the integer classes
 def binarise(test, classes):
     test = label_binarize(test, classes=classes)
     return test
 
-
+# (FROM CS3099 ML7) computes roc curve for multi class, for saving if prefer to separate
+# plots for all classes add kwargs['all'] = True, else generate micro and macro average
+# by default
 def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
     k = 1
     nSamples = len(y_true)
@@ -235,31 +240,19 @@ def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
     classes = [x for x in list(dico.values())]
     # Computes ROC curve and area for each class
     y_true = binarise(y_true, classes)
-    print("changed y_true\n")
-    print(y_true)
     y_pred = np.array(y_pred)
-    print("y_pred is \n")
-    print(y_pred)
-    print("shape of y_pred ", y_pred.shape)
-    print("apply squeeze to y_pred, ", np.squeeze(y_pred).shape)
     y_pred = np.squeeze(y_pred)
     rocAuc = dict()
     fpr = dict()
     tpr = dict()
-    #print("shape of y_true ", str(y_true.shape), " shape of y_pred ", str(y_pred.shape))
+
     for i in range(len(classes)):
         tprs = []
         meanFpr = np.linspace(0, 1, nSamples)
         # Computes by k fold cross validation where length of self.values_ denotes value of k
-        print("shape of partial ", y_pred[i,:].shape)
-        print("shape of partial y_true ", y_true[:,i].shape)
         jFpr, jTpr, _ = roc_curve(y_true[:,i].flatten(), y_pred[:,i].flatten())
         tprs.append(interp(meanFpr, jFpr, jTpr))
         tprs[-1][0] = 0.
-        # for j in range(k):
-        #     jFpr, jTpr, _ = roc_curve(y_true[j][:, i], y_pred[j][:, i])
-        #     tprs.append(interp(meanFpr, jFpr, jTpr))
-        #     tprs[-1][0] = 0.
 
         meanTpr = np.mean(tprs, axis=0)
         meanTpr[-1] = 1.0
@@ -276,13 +269,17 @@ def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
     if save:
         name = kwargs['name']
     if show:
-        show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=True)
-    #show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=show)
+        if 'all' in kwargs:
+            show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=True)
+        else:
+            show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=show)
     else:
         #print values of rocAuc instead!
         print(rocAuc)
     return rocAuc
 
+
+# (FROM CS3099 ML7) computes micro average
 def find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc):
     # Computes micro-average ROC curve and area
     tprsMicro = []
@@ -290,16 +287,14 @@ def find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc):
     fprMicro, tprMicro, _ = roc_curve(y_true.ravel(), y_pred.ravel())
     tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
     tprsMicro[-1][0] = 0.
-    # for j in range(k):
-    #     fprMicro, tprMicro, _ = roc_curve(y_true[j].ravel(), y_pred[j].ravel())
-    #     tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
-    #     tprsMicro[-1][0] = 0.
     meanTprMicro = np.mean(tprsMicro, axis=0)
     meanTprMicro[-1] = 1.0
     fpr["micro"] = meanFpr
     tpr["micro"] = meanTprMicro
     rocAuc["micro"] = round(auc(meanFpr, meanTprMicro), 2)
 
+
+# (FROM CS3099 ML7) computes macro average
 def find_macro(fpr, tpr, rocAuc, classes):
     # Computes macro-average ROC curve and area
     allFpr = np.unique(np.concatenate([fpr[i] for i in range(classes.shape[0])]))
@@ -312,6 +307,8 @@ def find_macro(fpr, tpr, rocAuc, classes):
     tpr["macro"] = meanTpr
     rocAuc["macro"] = round(auc(fpr["macro"], tpr["macro"]), 2)
 
+
+# use bokeh roc curve visualiser to to plot micro and macro average AUC
 def show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=False):
     output_file("roc.html")
     from bokeh.models import Legend, LegendItem
@@ -331,6 +328,8 @@ def show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=False):
 
     show(p)
 
+
+# use matplotlib to plot individual roc curves for all classes
 def show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=False):
     palette = cycle(sns.color_palette())
     classes = np.asarray(classes)
@@ -345,9 +344,6 @@ def show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=False):
                        ''.format(rocAuc["macro"]),
                  color='navy', linestyle=':', linewidth=4)
 
-        #colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'lawngreen', 'purple'
-        #'dimgrey', 'gold', 'darkcyan', 'crimson', 'darkgreen', 'red', 'orange', 'green', 'blue', 'navy', 'brown', 'black', ])
-        #for i, color in zip(range(classes.shape[0]), colors):
         plt.plot(fpr[i], tpr[i], color='aqua', lw=lw,
                   label='ROC curve of class {0} (area = {1:0.2f})'
                       ''.format(i+1, rocAuc[i]["area"]))
@@ -355,6 +351,8 @@ def show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=False):
                 alpha=.2)
         plot_roc_grid('multi', name+"cl-"+str(i+1), path, fig, show=show)
 
+
+# (FROM CS3099 ML7) plot the grid for matplotlib ROC curve plot
 def plot_roc_grid(type, name, path, fig, show=False):
     plt.xlabel('1 - Specificity')
     plt.ylabel('Sensitivity')
@@ -362,38 +360,37 @@ def plot_roc_grid(type, name, path, fig, show=False):
     plt.legend(loc='lower right', fontsize='small')
     if name is not None:
         plt.savefig(path + '/' + type + '_roc_' + name + '.svg', format = "svg")
-
     if show:
         if name==None:
             name = 'roc_curve_example'
         plt.show(fig)
     else:
         plt.close(fig)
+#
+# # (FROM CS3099 ML7)
+# def get_rates(y_true, y_pred, cm):
+#     rates = dict()
+#     row_sum = cm.sum(axis=1)
+#     len = cm.shape[0]
+#     total_sum = cm.sum()
+#     ver_sum = cm.sum(axis=0)
+#
+#     for i in range(len):
+#         output = []
+#         tpr = cm[i][i] / row_sum[i]
+#         fn = row_sum[i] - cm[i][i]
+#         fp = ver_sum[i] - cm[i][i]
+#         tnr = (total_sum - cm[i][i] - fn - fp) / (total_sum - row_sum[i])
+#         # get classification accuracy and mis-classification
+#         accuracy = accuracy_score(y_true, y_pred)
+#         output.append(('accuracy', round(accuracy, 3)))
+#         output.append(('error', round(1 - accuracy, 3)))
+#         output.append(('sensitivity', round(tpr, 3)))
+#         output.append(('specificity', round(tnr, 3)))
+#         rates[i] = output
+#     return rates
 
-
-def get_rates(y_true, y_pred, cm):
-    rates = dict()
-    row_sum = cm.sum(axis=1)
-    len = cm.shape[0]
-    total_sum = cm.sum()
-    ver_sum = cm.sum(axis=0)
-
-    for i in range(len):
-        output = []
-        tpr = cm[i][i] / row_sum[i]
-        fn = row_sum[i] - cm[i][i]
-        fp = ver_sum[i] - cm[i][i]
-        tnr = (total_sum - cm[i][i] - fn - fp) / (total_sum - row_sum[i])
-        # get classification accuracy and mis-classification
-        accuracy = accuracy_score(y_true, y_pred)
-        output.append(('accuracy', round(accuracy, 3)))
-        output.append(('error', round(1 - accuracy, 3)))
-        output.append(('sensitivity', round(tpr, 3)))
-        output.append(('specificity', round(tnr, 3)))
-        rates[i] = output
-    return rates
-
-
+# (FROM RASTA) predict the style for a single image
 def get_pred(model_path, image_path, top_k=1):
     model = load_model(model_path)
     target_size = (224, 224)
@@ -404,13 +401,13 @@ def get_pred(model_path, image_path, top_k=1):
     dico = get_dico()
     inv_dico = invert_dico(dico)
     args_sorted = np.argsort(pred)[0][::-1]
-    #print("predicted percents: ")
-    #print(args_sorted[:top_k])
     preds = [inv_dico.get(a) for a in args_sorted[:top_k]]
     pcts = [pred[0][a] for a in args_sorted[:top_k]]
     return preds, pcts
 
 
+# calculates classification report output including precision, recall, and f1 score
+# saves as image with heatmap and a csv
 def get_classification_report(y_true, y_pred, labels, name, title, show=True, save=False, **kwargs):
     ddl_heat = ['#DBDBDB', '#DCD5CC', '#DCCEBE', '#DDC8AF', '#DEC2A0', '#DEBB91',
                 '#DFB583', '#DFAE74', '#E0A865', '#E1A256', '#E19B48', '#E29539']
@@ -439,7 +436,6 @@ def get_classification_report(y_true, y_pred, labels, name, title, show=True, sa
     ax = sns.heatmap(matrix, annot=True, fmt='.2f', cmap='Blues')
 
     ax.figure.tight_layout()
-    #ax.figure.subplots_adjust(left=0.5)
     plt.title(title)
     plt.ylabel('Classes')
     plt.xlabel('Measures')
@@ -449,7 +445,6 @@ def get_classification_report(y_true, y_pred, labels, name, title, show=True, sa
             path = kwargs['path']
         plt.savefig(path + '/class_report_' + name + '.svg', format='svg', bbox_inches='tight')
         matrix.to_csv(join(path, name + 'classification_report.csv'))
-        #classification_report_to_csv(cr, path, name=name)
     if show:
 
         plt.show()
@@ -585,6 +580,7 @@ def plot_history_plotly(history, type, name, path=None, save=False, show=False):
         print(join(path, name + '.html'))
         print("saved")
 
+# display scaled image
 def show_image(img_path):
     img = load_img(img_path, target_size=(224,224))
     x = img_to_array(img)
@@ -593,6 +589,7 @@ def show_image(img_path):
     plt.savefig(img_path.rsplit('/', 1)[1] + '_scaled.jpg')
     plt.show()
 
+# image try to reconstruct it using the autoencoder
 def decode_image_autoencoder(model_path, img_path, target_size):
     autoencoder = load_model(model_path)
     img = load_img(img_path, target_size=target_size)
@@ -614,6 +611,7 @@ def decode_image_autoencoder(model_path, img_path, target_size):
 
 
 # FUNCTION FROM rasta.python.utils.utils
+# (FROM RASTA) returns class indices for corresponding class label
 def get_dico():
     classes = []
     PATH = os.path.dirname(__file__)
@@ -625,24 +623,28 @@ def get_dico():
     class_indices = dict(zip(classes, range(len(classes))))
     return class_indices
 
-
+# invert the dictionary to be value:label
 def invert_dico(dico):
     return {v: k for k, v in dico.items()}
 
+# write the output to csv
 def write_to_csv(path, data, type):
     FIELDNAMES = list(data.keys()).sort()
+    ordered_dict = OrderedDict(sorted(data.items(), key=lambda t: t[0]))
     with open(join(path, '_'+type+'.csv'), 'a+', newline='') as f:
         lines = f.readlines()
         l = len(lines)
         head = True
         if l > 1:
             head = False
-        w = csv.DictWriter(f, FIELDNAMES)
+        w = csv.DictWriter(f, ordered_dict.keys())
         if head:
             w.writeheader()
-        w.writerow(row for row in zip(*(data[key] for key in FIELDNAMES)))
+        w.writerow(ordered_dict)
 
 
+# main method decoding user command line options and use respective method calls
+# in the case of -t acc or pred only
 def evaluate():
     MODEL_PATH = args.model_path
     PRE_PATH = ''
@@ -660,17 +662,14 @@ def evaluate():
     SAVE = args.save
     if SAVE:
         SAVE_PATH = args.save_path
-    # SAVE_PATH = join(args.save_path, name)
-    # create_dir(join(SAVE_PATH, name))
     else:
         SAVE_PATH = None
     if args.type == 'acc':
-        y_t, y_p, y_true, y_pred, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K)
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
         if args.model_name is not None:
             name = name + '-' + args.model_name
         SHOW = args.show_g
-
+        y_t, y_p, y_true, y_pred, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K, save=SAVE, path=SAVE_PATH, name=name)
 
         if args.get_cm:
             cm = get_confusion_matrix(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
@@ -688,7 +687,7 @@ def evaluate():
 
 
     else:
-        v = 5#K[0]
+        v = 5
         pred, pcts = get_pred(MODEL_PATH, DATA_PATH, top_k=v)
         print(pcts)
         if SAVE:
@@ -696,11 +695,14 @@ def evaluate():
             print(json.dumps(result))
         else:
             print("Top-{} prediction : {}".format(k, pred))
+
+
 his_type = {
     'a': 'Accuracy',
     'l': 'Loss'
 }
 
+# method for any options to plot history or generating activation maps
 def plot():
     if args.plot_his is not None:
         his_t = args.plot_his
@@ -716,40 +718,10 @@ def plot():
         DATA_PATH = args.data_path
         if DATA_PATH is None:
             DATA_PATH = IMG_PATH
-        #model_path, img_path, target_size, layer_no, plot_size=(2,2))
         layer_no = args.act
         get_act_map(MODEL_PATH, DATA_PATH, (224, 224), layer_no=layer_no, save=args.save, path=args.save_path, name=args.model_name + "-" + layer_no + "-act-map", show=args.show_g)
 
-# evaluate for finding model accuracy and prediction by running the model on test set
-# should have -t tag indicating one of the options
 if args.type is not None:
     evaluate()
-# anything else including visualising activation maps and plotting history
-# --act (need -m, -d (has to be a path to an image file in this case), --act (layer name/index), --show, -s, --save)
-# --his (need -f, --show, -s, --save)
 else:
     plot()
-
-#show_image(IMG_PATH)
-#decode_image_autoencoder(MODEL_PATH, IMG_PATH, (224,224))
-#get_act_map(MODEL_PATH, IMG_PATH, target_size=(224, 224), layer_no=171)
-
-#his = pickle.load(open('models/resnet50_2-4-15-35_empty_layers-3-s-0/history.pck', 'rb'))
-    #'models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/'
-     #                  '12-0.408._retrain_layers-3-s-4/history.pck', 'rb'))
-#print(his)
-#plot_history_plotly(his, 'Accuracy', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_acc_plotly')
-#plot_history_plotly(his, 'Loss', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_loss_plotly')
-#plot_history_hover(his, 'Loss', save=True, path='models/eval/resnet50_1-24-13-58_empty_tune-3-no-0', name='resnet50_retrained_12-0.40_loss')
-    # resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5
-    # MODEL_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retraintune-7-no-0/04-0.144._tune-7-no-0/06-0.162._tune-8-no-1/04-0.180.hdf5"
-
-    # DIR_PATH = "../models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1"
-    # y_true, y_pred = get_y_prediction(MODEL_PATH,"../data/wikipaintings_small/wikipaintings_test")
-    # get_confusion_matrix(y_true, y_pred, show=True, path=DIR_PATH, name="12-0.408")
-    # display_cm_hover(MODEL_PATH, y_true, y_pred)
-    # print(get_dico())
-    # names = list(get_dico().keys())
-    # print(names)
-    # print("in format")
-    # print(list(reversed(names)))

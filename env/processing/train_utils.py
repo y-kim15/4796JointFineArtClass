@@ -5,22 +5,17 @@ from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform, VarianceScaling
 from keras.regularizers import l2
 from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import LearningRateScheduler
 from keras.constraints import MaxNorm
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, \
     GlobalAveragePooling2D, UpSampling2D, BatchNormalization, Activation, ZeroPadding2D, AveragePooling2D
 from keras.optimizers import Adam, RMSprop, Adadelta, SGD, Nadam
 from keras import backend as K
-from rasta.custom_resnets import *
-from rasta.alexnet import decaf,alexnet
 from contextlib import redirect_stdout
 import numpy as np
 import datetime
-import os
+import math, re, sys, os
 from os.path import join
-import math
-from keras.callbacks import LearningRateScheduler
-import re
-import sys
 import pandas, json
 
 dirname = os.path.dirname(__file__)
@@ -30,29 +25,23 @@ N_CLASSES = 25
 def fixed_generator(generator):
     for batch in generator:
         yield (batch[0], batch[0])
-        #yield batch
-# Code influenced by keras application examples
-# that from rasta and from ...
 
+# Code influenced by keras application examples
+
+# Autoencoder 2 with bottom most layer from VGG16
 def get_autoencoder2(input_shape, add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(input)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = MaxPooling2D((2,2), padding='same')(x)
-   # x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
     encoded = MaxPooling2D((2, 2), padding='same')(x)
 
-    #x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(encoded)
-    #x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(x)
-    #x = UpSampling2D((2,2))(x)
-    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding = 'same')(encoded)#x)
+    x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding = 'same')(encoded)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding = 'same')(x)
     x = UpSampling2D((2,2))(x)
     decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
-
     return input, decoded
-# resnet
+
+# Autoencoder 1 with 2 blocks of VGG16
 def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     input = Input(shape=input_shape)
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(input)
@@ -60,16 +49,8 @@ def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     x = MaxPooling2D((2,2), padding='same')(x)
     x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
     x = Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = MaxPooling2D((2, 2), padding='same')(x)
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
     encoded = MaxPooling2D((2, 2), padding='same')(x)
 
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(encoded)
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = Conv2D(256, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
-    #x = UpSampling2D((2,2))(x)
     x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(encoded)
     x = Conv2D(128, (3,3), strides=(1,1), activation='relu', padding = 'same')(x)
     x = UpSampling2D((2,2))(x)
@@ -77,7 +58,6 @@ def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
     x = Conv2D(64, (3, 3), strides=(1, 1), activation='relu', padding='same')(x)
     x = UpSampling2D((2, 2))(x)
     decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
-
     return input, decoded
 
 def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained):
@@ -93,13 +73,11 @@ def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained):
     # added below
     if add_reg is not None and dropout > 0:
         x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    #elif add_reg is None and dropout > 0:
-     #   x = Dense(128, activation='relu')(x)
+    elif add_reg is None and dropout > 0:
+       x = Dense(128, activation='relu')(x)
     if dropout > 0 and pretrained == 2:
         x = Dropout(dropout)(x)
-    #else:
-    #    x = Dense(128, activation='relu')(x)
-    # up to above
+
     if add_reg is not None:
         output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
     else:
@@ -124,9 +102,6 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained):
         x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
-    #else:
-    #    x = Dense(128, activation='relu')(x)
-    # up to above
     if add_reg is not None:
         output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
     else:
@@ -149,13 +124,10 @@ def get_resnet50(input_shape, add_reg, alpha, dropout, pretrained):
     # added below
     if add_reg is not None and dropout > 0:
         x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    #elif add_reg is None and dropout > 0:
-    #    x = Dense(128, activation='relu')(x)
+    elif add_reg is None and dropout > 0:
+        x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
-    #else:
-    #    x = Dense(128, activation='relu')(x)
-    # up to above
     if add_reg is not None:
         output = Dense(N_CLASSES, activation='softmax', kernel_regularizer=add_reg(alpha))(x)
     else:
@@ -171,12 +143,9 @@ get_model = {
 }
 
 
+# Gets model instance according to user configuration
 def get_new_model(model_type, input_shape, reg, alpha, init, drop, pretrained, n_train):
     data_type = True
-    #if int(pretrained) > 0:
-    #    tr = True
-    #else:
-    #    tr = False
     if model_type in get_model:
         base_model, output = get_model[model_type](input_shape, reg, alpha, drop, pretrained)
         if re.search('auto*', model_type):
@@ -186,6 +155,7 @@ def get_new_model(model_type, input_shape, reg, alpha, init, drop, pretrained, n
             model = Model(inputs=base_model.input, outputs=output)
     return model, data_type
 
+# Copies weights from old model to the new within given range of layers
 def copy_range(old_model, new_model, ran):
     try:
         start = int(ran.split('-')[0])
@@ -194,9 +164,9 @@ def copy_range(old_model, new_model, ran):
             new_model.layers[i].set_weights(old_model.layers[i].get_weights())
     except ValueError:
         sys.exit("ValueError: incorrect range of layers specified")
-
     return new_model
 
+# Copies weights of a single layer
 def copy_layer(old_model, new_model, layer_no):
     try :
         if int(layer_no) > 0:
@@ -214,6 +184,8 @@ copy_type = {
     'layer':copy_layer
 }
 
+# Copies weights from old to new model, check the specified syntax of layer_no
+# to decide to call copy range or copy a layer
 def copy_weights(old_model, new_model, layer_no):
     if '-' in layer_no:
         if ',' in layer_no:
@@ -234,6 +206,8 @@ def copy_weights(old_model, new_model, layer_no):
         new_model = copy_type['layer'](old_model, new_model, layer_no)
     return new_model
 
+# Sets trainable layers of a model by checking the indices included in layers
+# by the user, where it takes the form of comma separted nested with range values with '-'
 def set_trainable_layers(model, layers):
     changed = False
     if '-' not in layers:
@@ -292,32 +266,12 @@ def set_trainable_layers(model, layers):
         try:
             if ',' in layers:
                 multi = layers.split(',')
-                '''if '-' in multi[0]:
-                    start = int(multi[0].split('-')[0])
-                else:
-                    start = multi[0]
-                if '-' in multi[len(multi)-1]:
-                    end = int(multi[len(multi)-1].split('-')[1])
-                else:
-                    end = int(multi[len(multi)-1])
-                for layer in model.layers[0:start]:
-                    if layer.trainable == True:
-                        changed = True
-                    layer.trainable = False
-                for layer in model.layers[end + 1:]:
-                    if layer.trainable == True:
-                        changed = True
-                    layer.trainable = False'''
                 for i in range(len(multi)):
-                    print("total layers is ", str(len(model.layers)))
                     if '-' in multi[i]:
                         start = int(multi[i].split('-')[0])
                         end = int(multi[i].split('-')[1])
-                        print("start is ", str(start))
-                        print("end is ", str(end))
                         if start >= len(model.layers) or end >= len(
                                 model.layers) or start < 0 or end < 0 or start >= end:
-                            print("raise error! invalid index")
                             raise ValueError
                         for layer in model.layers[start:end + 1]:
                             if layer.trainable == False:
@@ -327,7 +281,6 @@ def set_trainable_layers(model, layers):
                         if model.layers[int(multi[i])].trainable == False:
                             changed = True
                         model.layers[int(multi[i])].trainable = True
-
             else:
                 start = int(layers.split('-')[0])
                 end = int(layers.split('-')[1])
@@ -349,6 +302,7 @@ def set_trainable_layers(model, layers):
             sys.exit("Error in input of the number of trainable layers")
     return model, changed
 
+# Returns suitable name for model in for training
 def get_model_name(sample_no, type='empty', multi=False, model_type='resnet50', n_tune=0, **kwargs):
     if type == 'empty':
         if not multi:
@@ -370,6 +324,7 @@ def get_model_name(sample_no, type='empty', multi=False, model_type='resnet50', 
     name = name + "-s-" + str(sample_no)
     return name
 
+# Saves model architecture summary
 def save_summary(dir_path, name, model):
     file_name = name + '_' + "summary.txt"
     file_path = join(dir_path, file_name)
@@ -377,29 +332,13 @@ def save_summary(dir_path, name, model):
         with redirect_stdout(f):
             model.summary()
 
-def center_crop(x, center_crop_size, **kwargs):
-    centerw, centerh = x.shape[1]//2, x.shape[2]//2
-    halfw, halfh = center_crop_size[0]//2, center_crop_size[1]//2
-    return x[:, centerw-halfw:centerw+halfw,centerh-halfh:centerh+halfh]
-
-def random_crop(x, random_crop_size, sync_seed=None, **kwargs):
-    np.random.seed(sync_seed)
-    w, h = x.shape[1], x.shape[2]
-    rangew = (w - random_crop_size[0]) // 2
-    rangeh = (h - random_crop_size[1]) // 2
-    offsetw = 0 if rangew == 0 else np.random.randint(rangew)
-    offseth = 0 if rangeh == 0 else np.random.randint(rangeh)
-    return x[:, offsetw:offsetw+random_crop_size[0], offseth:offseth+random_crop_size[1]]
-
-
-
+# Returns data generator for train and val set for general, and autoencoder training =
+# this is distinguished by train_type as data for autoencoder training is not tagged.
 def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
-    if function == 'vgg16' or function == 'resnet50':
+    if function == 'vgg16' or function == 'resnet50' or function == 'inceptionv3':
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
     elif re.search('auto*', function):
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=id_preprocess_input)
-    else:
-        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
 
     if train_type:
         generator = datagen.flow_from_directory(
@@ -418,7 +357,7 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
     return generator
 
 
-# learning rate schedule
+# Callback for step decay of learning rate
 def lr_decay_callback(lr_init, lr_decay):
     def step_decay(epoch):
         drop = 5
@@ -427,25 +366,11 @@ def lr_decay_callback(lr_init, lr_decay):
     return LearningRateScheduler(step_decay)
 
 
+# Callback for exponential decay of learning rate
 def lr_decay_callback2(lr_init, lr_decay):
     def exp_decay(epoch):
         return lr_init * math.exp(-lr_decay * epoch)
     return LearningRateScheduler(exp_decay)
-
-def step_decay(epoch):
-    initial_lrate = 0.1
-    drop = 0.5
-    epochs_drop = 10.0
-    lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
-    return lrate
-
-
-# learning rate schedule
-def exp_decay(epoch):
-   initial_lrate = 0.01
-   k = 0.1
-   lrate = initial_lrate * math.exp(-k * epoch)
-   return lrate
 
 
 optimiser = {
@@ -456,7 +381,7 @@ optimiser = {
     'nadam': Nadam
 }
 
-
+# Gets instance of optimiser according to configuration set from the user.
 def get_optimiser(opt, lr, decay, mom, n_epoch):
     if decay.isdigit():
         if opt == 'sgd':
@@ -476,6 +401,8 @@ def get_optimiser(opt, lr, decay, mom, n_epoch):
                 return optimiser[opt](lr=lr, momentum=mom)
 
 
+# Preprocessing function (FROM RASTA)
+# mean subtraction
 def imagenet_preprocess_input(x):
     # 'RGB'->'BGR'
     x = x[:, :, ::-1]
@@ -485,14 +412,7 @@ def imagenet_preprocess_input(x):
     x[:, :, 2] -= 123.68
     return x
 
-
-def scale_preprocess_input(x):
-    x[:, :, 0] -= 133.104
-    x[:, :, 0] -= 119.973
-    x[:, :, 0] -= 104.432
-    x *= 1./255
-    return x
-
+# Preprocessing function for Autoencoder
 # zero-center by mean pixel calculated for id_medium_train
 def id_preprocess_input(x):
     # 'RGB'->'BGR'
@@ -503,7 +423,7 @@ def id_preprocess_input(x):
     #x *= 1./255
     return x
 
-
+# WP centered
 def wp_preprocess_input(x):
     # 'RGB'->'BGR'
     x = x[:, :, ::-1]
@@ -513,11 +433,13 @@ def wp_preprocess_input(x):
     x[:, :, 2] -= 104.432
     return x
 
+# Returns merged dictionary
 def merge_two_dicts(x, y):
     z = x.copy()   # start with x's keys and values
     z.update(y)    # modifies z with y's keys and values & returns None
     return z
 
+# dictionary with mapping of command line abbrev with variable in code
 cmds= {
     "t": "train_type",
     "b": "batch_size",
@@ -533,6 +455,7 @@ cmds= {
     "w": "add_wei"
 }
 
+# Given a csv path with output from train hyp, saves sorted csv file
 def save_ordered(csv_path):
     data = pandas.read_csv(csv_path, encoding='utf-8-sig')
     headers = list(data[:0])
@@ -540,6 +463,8 @@ def save_ordered(csv_path):
     sorted.to_csv(join(csv_path.rsplit('/', 1)[0], '_output_ordered.csv'), header=headers, index=True)
     return sorted
 
+# At the end of GridSearch, goes through the csv file ordered and generates/saves
+# top combinations to json or as std out
 def get_best_comb_from_csv(csv_path, sorted, params, top=3, save=False):
     print(sorted)
     best = "Best Combination of "

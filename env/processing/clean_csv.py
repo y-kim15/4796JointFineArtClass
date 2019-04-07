@@ -8,12 +8,11 @@ import requests
 import time
 import shutil
 
-# methods to process idb csv file
+# mapping to process special characters present in the file
 special_char = {"aEURoe": "", "aEUR": "", "a%0": "e", "EUR(tm)": "", "a3": "o", "a(c)": "e", "aa": "a", "aSS": "c"}
 
-
+# Creates directory to the path, overwrite if exists and remove = True
 def create_dir(file_path, remove=True):
-    # method to create directory if doesn't exist, overwrite current if exists
     if os.path.exists(file_path):
         if remove:
             shutil.rmtree(file_path)
@@ -23,9 +22,10 @@ def create_dir(file_path, remove=True):
 
 
 class Clean:
+
     @staticmethod
     def read_csv(path):
-        # read in csv
+        # read csv
         data = pandas.read_csv(path, encoding='utf-8-sig')
         headers = list(data[:0])
 
@@ -52,8 +52,6 @@ class Clean:
                 else:
                     if str in old:
                         new = old.replace(str, "")
-                # print("Yes")
-                # new = old.replace(str, "")
             else:
                 old = unidecode.unidecode(old)
 
@@ -61,8 +59,6 @@ class Clean:
                 for j in special_char:
                     if j in old:
                         new_str = new_str.replace(j, special_char[j])
-                # if new_str == "":
-                #    new_str = old
                 new = new_str
 
             new_data.iloc[i][col_name] = new
@@ -74,12 +70,11 @@ class Clean:
         # creates unique id for every row in format of xx-yy where xx for artist
         # yy for work count of an artist
         # col_name to generate the code on
-        new_data = pandas.DataFrame.copy(df)  # MIGHT NOT NEED THIS
+        new_data = pandas.DataFrame.copy(df)
         i = 0  # total
         current = ""  # current artist
         current_i = 0  # current artist count
         current_j = 0  # current artist work count
-        # for(new, old) in zip (new_data["agent_display"], data["agent_display"]):
         artist_count = {}
         work_count = {}
         for old in df[col_name]:
@@ -102,8 +97,6 @@ class Clean:
             new = str(current_i) + "-" + str(current_j)
             new_data.id_agent[i] = current_i
             new_data.id_count[i] = current_j
-            #new_data.iloc[i, "id_agent"] = current_i
-            #new_data.iloc[i, "id_count"] = current_j
             i += 1
 
         new_data.id_agent = new_data.id_agent.astype(int)
@@ -163,18 +156,16 @@ class Clean:
 
     @staticmethod
     def match_names(data):
+        # goes through every row in data and replace artist names to be
+        # uniform for the same artist (remove redundant names)
         new_data = pandas.DataFrame.copy(data)
         first = ""
         i = 0
         for index, row in new_data.iterrows():
-            # print(type(row["agent_display"]))
-            # print("current name is %s", row["agent_display"])
-            # print("current first is %s", first)
             if first == "":
                 first = row["agent_display"]
             else:
                 out = Clean.lcs(first, row["agent_display"])
-                # print("out is %s", out)
                 if Clean.lcs(first, row["agent_display"]) == first:
                     # print("YES")
                     new_data.iloc[i]["agent_display"] = first
@@ -190,11 +181,9 @@ class Clean:
         headers = list(df[:0])
         i = 0
         rows = df.loc[df["id"].str.contains("-" + str(min))]
-
         for index, row in rows.iterrows():
-            # print(row["agent_display"])
             i += 1
-        print("total number of artist is", i)
+        #print("total number of artist is", i)
 
     @staticmethod
     def check_if_similar(sample_name, other_name, type):
@@ -225,6 +214,7 @@ class Clean:
 
     @staticmethod
     def check_if_true(df, dropped_df, sub_df, artist_str, title_str, d, **date):
+        # drops same artist for if similar
         if sub_df is not None and Clean.check_if_similar(sub_df[0]["agent_display"], artist_str, True):
             artist_rows = sub_df
         else:
@@ -240,12 +230,11 @@ class Clean:
 
         if d:
             date_str = date["date"]
-            # date = df["date_display"].apply(lambda x: Clean.check_if_similar(date_str, x, None))
-
         return new_df, dropped_df, sub_df, total_drop
 
     @staticmethod
     def remove_match_images(data_path, input_csv, output_csv, dropped_csv):
+        # removes images that match
         # read in csv
         df = pandas.read_csv(input_csv, encoding='utf-8-sig')
         df.set_index(['id'])
@@ -292,6 +281,7 @@ class Clean:
 
     @staticmethod
     def _download_image(file_name, url):
+        # (FROM RASTA) downloads image via url
         try:
             img = Image.open(requests.get(url, stream=True).raw).convert('RGB')
             img.save(file_name + '.jpg', 'JPEG')
@@ -300,6 +290,7 @@ class Clean:
 
     @staticmethod
     def download_image_database(input_csv, target_path):
+        # (FROM RASTA) modified - to download image database images via url
         create_dir(target_path, remove=False)
         # method referred from rasta.python.utils.load_data.download_wikipaintings() and _download_image()
         df = pandas.read_csv(input_csv, encoding='utf-8-sig')
@@ -319,6 +310,7 @@ class Clean:
 
     @staticmethod
     def convert_name_order(df, col_name):
+        # convert the name orders for artists
         new_df = pandas.DataFrame.copy(df)
         i = 0
         for names in df[col_name]:
@@ -336,7 +328,7 @@ class Clean:
 
     @staticmethod
     def filter_artists(wiki_csv, id_csv, target_id_csv):
-        # method to get works by artists only in wiki from ID images
+        # filter out artists only in wiki by comparing with ID database
         wiki_df = pandas.read_csv(wiki_csv, header=0)
         id_df = pandas.read_csv(id_csv, header=0)
         headers = list(id_df[:0])
@@ -358,6 +350,8 @@ class Clean:
 
 
 if __name__ == '__main__':
+    # code usage example (this script is used to clean the provided csv file of image entries from image database)
+    # due to the School Policy, the csv is kept confidential hence could not be added in the repo
     """path = "./data/cleaning_1710.csv"
     data, headers = Clean.read_csv(path)
     data = Clean.remove_str(data, "agent_display", False)
@@ -384,7 +378,7 @@ if __name__ == '__main__':
     #Clean.filter_artists("../data/wikipaintings_full_image.csv", "../data/filtered_full_large1_no_link.csv", "../data/filtered_2_full_large1_no_link.csv")
     #Clean.download_image_database("../data/filtered_full_large11.csv", "../data/id_database_medium")
     # filtered_full_large2 here since first created files rows are removed, added option to ignore if the file already exists
-    data = pandas.read_csv("../data/wikipaintings_full_image.csv", header=0)
-    headers = list(data[:0])
-    data = Clean.assign_id(data, "agent_display")
-    data.to_csv("../data/id_wiki_full_large.csv", header=headers, index=False)
+    #data = pandas.read_csv("../data/wikipaintings_full_image.csv", header=0)
+    #headers = list(data[:0])
+    #data = Clean.assign_id(data, "agent_display")
+    #data.to_csv("../data/id_wiki_full_large.csv", header=headers, index=False)
