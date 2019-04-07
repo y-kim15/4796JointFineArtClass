@@ -122,9 +122,9 @@ which should be created using read_images - get_small_from_dataset
 
 ### More Training - GridSearch
 #### GridSearch on different parameter combination
-python3 train_hyp.py -t params [-j <json_file>] [-s]
+    python3 train_hyp.py -t params [-j <json_file>] [-s]
 #### Train one model config via CV
-python3 train_hyp.py -t cv -cv <k> [-s] -m <model_name>
+    python3 train_hyp.py -t cv -cv <k> [-s] -m <model_name>
 
 ```
 usage: train_hyp.py [-h] [-t TYPE] [-cv CV] [-j JSON_FILE] [-s]
