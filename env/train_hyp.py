@@ -32,7 +32,7 @@ models = {
         "-b": [30, 40],
         "-n": 3,
         "-lr": [0.0001, 0.00001]
-    }
+    },
     "inceptionv3": {
         "--model_type": "inceptionv3",
         "-e": 5,
@@ -48,10 +48,11 @@ FINAL_PATH = join(PATH, 'models')
 
 parser = argparse.ArgumentParser(description='Description')
 
-parser.add_argument('-t', action="store", default="params", dest='type', help='Type of Training [params|cv]')
-parser.add_argument('-cv', action="store", default=5, dest='cv', help='Set n-fold cv')
+parser.add_argument('-t', action="store", default="params", dest='type', help='Type of Training [params-GridSearch|cv-Cross Validation]')
+parser.add_argument('-cv', action="store", default=5, dest='cv', help='Set K for K-fold CV')
 parser.add_argument('-j', action="store", default=None, dest='json_file', help='Path to json file containing parameter values')
 parser.add_argument('-s', action="store_true",default=False, dest='save', help='Save the output in directory') #if false, will only report the best on cmd line and json
+parser.add_argument('--save', action="store", dest='save_path', help='Path to save the directory')
 parser.add_argument('-m', action="store", dest='model', help='Name of architecture to use [vgg16|inceptionv3|resnet50]')
 args = parser.parse_args()
 TYPE = args.type
@@ -61,6 +62,8 @@ if args.save:
     name = 'train_hyp' + '_' + str(now.month) + '-' + str(now.day) + '-' + str(now.hour) + '-' + str(now.minute)
     PATH = os.path.dirname(__file__)
     print(PATH)
+    if args.save_path is not None:
+        PATH = args.save_path
     FINAL_PATH = join(PATH, 'models', name)
     create_dir(join(PATH, 'models', name))
     path = ['-path', FINAL_PATH]

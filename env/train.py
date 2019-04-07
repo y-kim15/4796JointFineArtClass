@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 from os.path import join
-import argparse, time, picle, json
+import argparse, time, pickle, json
 from keras.models import load_model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
 from keras.regularizers import l1, l2
@@ -25,27 +25,29 @@ lap = "data/wikipaintings_full/wikipaintings_train#data/wikipaintings_full/wikip
 
 parser = argparse.ArgumentParser(description='Description')
 
-parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune|hyp]')
+### basic training by fit, use of callbacks, command line arguments are inspired from RASTA
+
+parser.add_argument('-t', action="store", default='empty', dest='train_type', help='Training type [empty|retrain|tune]')
 parser.add_argument('-m', action="store", dest='model_path',help='Path of the model file')
-parser.add_argument('--new_p', action="store", dest='new_path', help='Save in a new directory')
+parser.add_argument('--new_p', action="store", dest='new_path', help='New Path to save the train directory')
 parser.add_argument('--model_type', action='store', required=True, dest='model_type', help='Type of model [auto1|auto2|vgg16|inceptionv3|resnet50]')
-parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch.')
+parser.add_argument('-b', action="store", default=30, type=int, dest='batch_size',help='Size of the batch')
 parser.add_argument('-e', action="store",default=10, type=int, dest='epochs',help='Number of epochs')
-parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip or not')
-parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable',help='Set the number of trainable layers, range [a-b] or [csv] or single value [x] for last x layers only')
-parser.add_argument('-dp', action="store", default='lab', dest='data_path',help='Optional Full path to dataset')
+parser.add_argument('-f', action="store_true", default=False, dest='horizontal_flip',help='Set horizontal flip')
+parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable',help='Set the number of trainable layers, as range [a-b] or [csv] or single value [x] for last x layers or nested')
+parser.add_argument('-dp', action="store", default='lab', dest='data_path',help='# separated path to dataset for train and val')
 parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd|nadam]')
-parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
-parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning Rate for Optimiser [rate, step, exp, value]')
-parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
-parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha for Regularizer')
+parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Initial learning rate')
+parser.add_argument('--decay', action="store", default='none', dest='add_decay', help='Add decay to Learning rate [rate, step, exp, decimal value]')
+parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in penultimate Dense layer')
+parser.add_argument('--alp', action="store", default=0.0, type=float, dest='alpha', metavar='[0.0-1.0]', help='Value of Alpha hyperparameter for Regularizer')
 parser.add_argument('--dropout', action="store", default=0.0, type=float, dest='add_drop', metavar='[0.0-1.0]', help='Add dropout rate')
-parser.add_argument('--init', action="store", dest='add_init', help='Define type of Initialiser')
+parser.add_argument('--init', action="store", dest='add_init', help='Initialiser [he_normal|glorot_uniform]')
 parser.add_argument('--mom', action="store", default=0.9, type=float, dest='add_mom', metavar='[0.0-1.0]', help='Add momentum to SGD')
-parser.add_argument('-ln', action="store", default=None, dest='rep_layer_no', help='Select a layer/range/point onwards to copy to new model (keep)')
+parser.add_argument('-ln', action="store", default=None, dest='rep_layer_no', help='Set indices of a layer/range/point onwards to copy to new model (keep)')
 parser.add_argument('-tr', action="store", type=int, default=1, choices=[0,1,2], dest='pretrained', help="Get pretrained model [0:random weights, 1: keras without top layers, 2: keras full model]")
 parser.add_argument('-path', action="store", default="", dest="path", help='Path to save the train output file for train_hyp case')
-parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanaced data')
+parser.add_argument('-w', action="store_true", default=False, dest='add_wei', help='Add class weight for imbalanced data')
 
 args = parser.parse_args()
 print("Args: ", args)
@@ -153,9 +155,9 @@ train_generator = get_generator(TRAIN_PATH, BATCH_SIZE, target_size=(INPUT_SHAPE
 WEIGHTS = None
 if args.add_wei:
    counter = Counter(train_generator.classes)
-   #max_val = float(max(counter.values()))
-   #class_weights = {class_id: max_val / num_images for class_id, num_images in counter.items()}
-   class_weights = {class_id: 1.0 / num_images for class_id, num_images in counter.items()}
+   max_val = float(max(counter.values()))
+   class_weights = {class_id: max_val / num_images for class_id, num_images in counter.items()}
+   #class_weights = {class_id: 1.0 / num_images for class_id, num_images in counter.items()}
    WEIGHTS = class_weights
 
 # Compile for new model and recompile for any models with changed number of tainable layers

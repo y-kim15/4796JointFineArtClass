@@ -24,16 +24,18 @@ import os, json, pickle, csv, math, argparse
 
 MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
     #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
-IMG_PATH = "data/van-gogh_sunflowers.jpg"
+DEFAULT_IMG_PATH = "data/van-gogh_sunflowers.jpg"
 
 DEFAULT_MODEL_PATH = MODEL_PATH
 DEFAULT_SAVE_PATH = "models/eval"
 N_CLASSES = 25
 
+# (FROM RASTA) extended from evaluation.py to include additional statistics and evaluation tools
+
 parser = argparse.ArgumentParser(description='Description')
 
-parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model][acc|pred]')
-parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Validation Output and Save [path to csv to save]' )
+parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model, pred-predict an image][acc|pred]')
+parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Validation Output and Save [path to csv to save] to be used by train_hyp' )
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
@@ -47,8 +49,8 @@ parser.add_argument('-s', action="store_true", dest='save', default=False, help=
 parser.add_argument('--save', action="store", default=DEFAULT_SAVE_PATH, dest='save_path',
                     help='Specify save location')
 parser.add_argument('--his', action="store", dest='plot_his', help='Plot history, choose which to plot [l|a|b (default)]')
-parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot (extension pck)')
-parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Mandatory to call --his')
+parser.add_argument('-f', action="store", dest="file", help='Name of history file to plot: Reqruied for --his')
+parser.add_argument('--model_name', action="store", dest='model_name', help='Model types/name: Required for --his')
 parser.add_argument('--act', action="store", dest='act', help='Visualise activation function of layer [layer name or index]')
 parser.add_argument('--roc', action="store_true", dest='get_roc', help='Get Roc Curve')
 args = parser.parse_args()
@@ -616,7 +618,7 @@ def get_dico():
     classes = []
     PATH = os.path.dirname(__file__)
     #directory = join(PATH, 'data/wikipaintings_small/wikipaintings_train')
-    directory = "/cs/tmp/yk30/data/wikipaintings_small/wikipaintings_train"
+    directory = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train"
     for subdir in sorted(os.listdir(directory)):
         if os.path.isdir(os.path.join(directory, subdir)):
             classes.append(subdir)
@@ -648,15 +650,6 @@ def write_to_csv(path, data, type):
 def evaluate():
     MODEL_PATH = args.model_path
     PRE_PATH = ''
-    if args.lab:
-        PRE_PATH = '/cs/tmp/yk30/'
-    if args.data_path is not None:
-        DATA_PATH = args.data_path
-    else:
-        if args.data_size is not None and args.data_size=='f':
-            DATA_PATH = PRE_PATH + "data/wikipaintings_full/wikipaintings_test"
-        else:
-            DATA_PATH = PRE_PATH + "data/wikipaintings_small/wikipaintings_test"
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
     SAVE = args.save
@@ -665,6 +658,16 @@ def evaluate():
     else:
         SAVE_PATH = None
     if args.type == 'acc':
+        if args.lab:
+            PRE_PATH = '/cs/tmp/yk30/'
+        if args.data_path is not None:
+            DATA_PATH = args.data_path
+        else:
+            if args.data_size is not None and args.data_size=='f':
+                DATA_PATH = PRE_PATH + "data/wikipaintings_full/wikipaintings_test"
+            else:
+                DATA_PATH = PRE_PATH + "data/wikipaintings_small/wikipaintings_test"
+
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
         if args.model_name is not None:
             name = name + '-' + args.model_name
@@ -687,6 +690,8 @@ def evaluate():
 
 
     else:
+        if args.data_path is None:
+            DATA_PATH = DEFAULT_IMG_PATH
         v = 5
         pred, pcts = get_pred(MODEL_PATH, DATA_PATH, top_k=v)
         print(pcts)
