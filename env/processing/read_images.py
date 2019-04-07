@@ -341,6 +341,14 @@ if __name__ == '__main__':
     mean = s/t
     print(mean)'''
 
+    print(mean)'''
+    PATH = "../data/wikiart/wikiart"
+    dirs = os.listdir(PATH)
+    f = open("../wikiart_sum.csv", "w+")
+    f.write("Style,Count\n")
+    for dir in dirs:
+        f.write(dir + "," + str(count_files(join(PATH, dir))) + "\n")
+    f.close()
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"
     # generate_image_id_file(val_file_name, path_val, name)

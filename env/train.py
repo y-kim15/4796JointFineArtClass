@@ -43,7 +43,7 @@ parser.add_argument('-f', action="store_true", default=False, dest='horizontal_f
 parser.add_argument('-n', action="store", default='0', dest='n_layers_trainable',help='Set the number of trainable layers, range [a-b] or [csv] or single value [x] for last x layers only')
 parser.add_argument('-dp', action="store", default='lab', dest='data_path',help='Optional Full path to dataset')
 parser.add_argument('-d', action="store", default=0, type=int, dest='sample_n', choices=range(0, 5), metavar='[0-4]', help='Sample Number to use [0-4]')
-parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd]')
+parser.add_argument('--opt', action="store", default='adam', dest='optimiser', help='Optimiser [adam|rmsprop|adadelta|sgd|nadam]')
 parser.add_argument('-lr', action="store", default=0.001, type=float, dest='lr', help='Learning Rate for Optimiser')
 parser.add_argument('--decay', action="store", default='none', dest='add_decay', choices=['none', 'rate', 'step', 'exp', 'dec'], help='Add decay to Learning Rate for Optimiser')
 parser.add_argument('-r', action="store", default='none', dest='add_reg', choices=['none', 'l1', 'l2'], help='Add regularisation in Conv layers')
@@ -245,8 +245,8 @@ else:
     extra = extra1
 orig = vars(args)
 orig['path'] = dir_path + '/' + name
-data = OrderedDict()
 data = merge_two_dicts(orig, extra)
+ordered_dict = OrderedDict(sorted(data.items(), key=lambda t: t[0]))
 with open(join(dir_path, '_history.pck'), 'wb') as f:
     pickle.dump(history.history, f)
     f.close()
@@ -256,15 +256,15 @@ if args.path == "":
     #    data = json.load(f)
     #data.update(extra)
     with open(join(dir_path, '_param.json'), 'w') as f:
-        json.dump(data, f)
+        json.dump(ordered_dict, f)
 else:
     if not os.path.isfile(join(dir_path, '_output.csv')):
         head = True
     else:
         head = False
-    FIELDNAMES = sorted(list(data.keys()))
+    FIELDNAMES = sorted(list(ordered_dict.keys()))
     with open(join(dir_path, '_output.csv'), 'a', newline='') as f:
         w = csv.DictWriter(f, FIELDNAMES)
         if head:
             w.writeheader()
-        w.writerow(row for row in zip(*(data[key] for key in FIELDNAMES)))
+        w.writerow(ordered_dict)

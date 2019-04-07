@@ -1,12 +1,15 @@
 from keras.models import load_model, Model
 from keras.preprocessing.image import load_img, img_to_array
+from sklearn.preprocessing import label_binarize
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, roc_curve, auc
 import matplotlib
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
+matplotlib.rcParams.update({'font.size': 8})
 from matplotlib import colors
 import seaborn as sns
 from keras import metrics
+from itertools import cycle
 from progressbar import ProgressBar
 from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input, id_preprocess_input, get_new_model
 from processing.read_images import count_files
@@ -37,7 +40,7 @@ parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Valid
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
-parser.add_argument('-dp', action="store_true", dest='lab', default=True, help="Set to test in lab", )
+parser.add_argument('-dp', action="store_true", dest='lab', help="Set to test in lab", )
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -56,7 +59,8 @@ args = parser.parse_args()
 # https://www.kaggle.com/amarjeet007/visualize-cnn-with-keras
 
 
-def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
+def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_size=(4,4), **kwargs):
+    plot_size = (4,4)
     # target size is the size of the image to load in
     # given layer 1 (index = 0) is input layer, put any value from 1 onwards in layer_no
     model = load_model(model_path)
@@ -76,19 +80,19 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
     new_x = x[np.newaxis,:,:,:]
     print("new shape of x ", x.shape)
     activations = act_model.predict(new_x, batch_size=1)
+    index = None
     if layer_no.isdigit() or isinstance(layer_no, int):
-        act = activations[layer_no]
+        index = int(layer_no)
     else: #returned is name of layer
-        index = None
         for idx, layer in enumerate(model.layers):
             if layer.name == layer_no:
                 index = idx
                 print("layer name: ", layer_no, ", with index: ", index)
                 break
-        act = activations[index]
+    act = activations[index]
     i = 0
-    print("original")
-    plt.imshow(img)
+    #print("original")
+    #plt.imshow(img)
     print("plotsize 0, ", plot_size[0])
     print("plotsize 1, ", plot_size[1])
     #f = plt.figure(figsize=(plot_size[0]*2.5, plot_size[1]*1.5))
@@ -99,17 +103,24 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
         for c in range(0, plot_size[1]):
             ax[r][c].imshow(act[0, :, :, i])
             i += 1
-
-    plt.show()
+    if save:
+        if 'path' in kwargs:
+            path = kwargs['path']
+        if 'name' in kwargs:
+            name = kwargs['name']
+        plt.savefig(path + '/' + name + '.svg', format='svg')
+    if show:
+        plt.show()
 
 
 def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
     try:
         model = load_model(model_path)
-    except ValueError:
+    except ValueError: # when the given hdf5 saves weights only
         model, _ = get_new_model(args.model_name, (224,224,3), None, None, None, 0, 1, 0)
         model.load_weights(model_path)
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='categorical_crossentropy',
+                      metrics=['accuracy'])
     model.metrics.append(metrics.top_k_categorical_accuracy)
     dico = get_dico()
     y_true = []
@@ -133,17 +144,19 @@ def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
             pred = model.predict(x[np.newaxis, ...])
             args_sorted = np.argsort(pred)[0][::-1]
             y_t.append(label)
-            y_p.append([a for a in args_sorted[:top_k]])
+            # use y_p to store original probability scores (on hold)
+            y_pred.append(pred)
+            #y_p.append(np.asarray(pred))
             y_pred_k.append([a for a in args_sorted[:top_k]])
             i += 1
             bar.update(i)
         y_true.append(y_t)
-        y_pred.append(y_p)
+       # y_pred.append(y_p)
     return y_true, y_pred, np.asarray(y_pred_k) #np.asarray(y_pred)
 
 
 def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
-    y_t, _ ,y_pred = get_y_prediction(model_path, test_path, k[2], target_size)
+    y_t, y_p ,y_pred = get_y_prediction(model_path, test_path, k[2], target_size)
     y_true = [j for sub in y_t for j in sub]
     #y_pred = [j for sub in y_p for j in sub]
     acc = []
@@ -161,7 +174,7 @@ def get_acc(model_path, test_path, k=[1, 3, 5], target_size=(224, 224)):
         acc.append(out / max)
     for n, a in zip(k, acc):
         print("Top-{} accuracy: {}%".format(n, a * 100))
-    y_p = [x[0] for x in y_pred]
+    #y_p = [x[0] for x in y_pred]
     return y_t, y_p, one_true, one_pred, k, acc
 
 
@@ -183,9 +196,9 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     classNames = [str(x) for x in list(dico.keys())]
     cm = pd.DataFrame(cm, columns=classNames, index=classNames)
     sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
+    #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     path = None
     name = None
     if save:
@@ -196,7 +209,6 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         plt.savefig(path + '/conf_matrix_' + name + '.svg', format='svg')
     if show:
         plt.show()
-    print(cm)
     return orig_cm
 
 # Finds the optimal cut-off point which returns the optimal true positive rate with
@@ -211,13 +223,26 @@ def find_opt_threshold(fprs, tprs):
             current = (fprs[i], tprs[i])
     return current
 
+def binarise(test, classes):
+    test = label_binarize(test, classes=classes)
+    return test
+
 
 def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
     k = 1
     nSamples = len(y_true)
     dico = get_dico()
-    classes = [str(x) for x in list(dico.keys())]
+    classes = [x for x in list(dico.values())]
     # Computes ROC curve and area for each class
+    y_true = binarise(y_true, classes)
+    print("changed y_true\n")
+    print(y_true)
+    y_pred = np.array(y_pred)
+    print("y_pred is \n")
+    print(y_pred)
+    print("shape of y_pred ", y_pred.shape)
+    print("apply squeeze to y_pred, ", np.squeeze(y_pred).shape)
+    y_pred = np.squeeze(y_pred)
     rocAuc = dict()
     fpr = dict()
     tpr = dict()
@@ -226,7 +251,9 @@ def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
         tprs = []
         meanFpr = np.linspace(0, 1, nSamples)
         # Computes by k fold cross validation where length of self.values_ denotes value of k
-        jFpr, jTpr, _ = roc_curve(y_true[:,i], y_pred[:,i])
+        print("shape of partial ", y_pred[i,:].shape)
+        print("shape of partial y_true ", y_true[:,i].shape)
+        jFpr, jTpr, _ = roc_curve(y_true[:,i].flatten(), y_pred[:,i].flatten())
         tprs.append(interp(meanFpr, jFpr, jTpr))
         tprs[-1][0] = 0.
         # for j in range(k):
@@ -243,19 +270,24 @@ def get_roc_curve(y_true, y_pred, save, path, show=False, **kwargs):
         optFpr, optTpr = find_opt_threshold(fpr[i], tpr[i])
         rocAuc[i]["optimal"] =  [("fpr", round(optFpr, 2)), ("tpr", round(optTpr, 2))]
     find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc)
-    find_macro(fpr, tpr, rocAuc, classes)
+    find_macro(fpr, tpr, rocAuc, np.asarray(classes))
 
     name = None
     if save:
         name = kwargs['name']
-    show_roc_curve(fpr, tpr, rocAuc, classes, name, path, show=show)
+    if show:
+        show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=True)
+    #show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=show)
+    else:
+        #print values of rocAuc instead!
+        print(rocAuc)
     return rocAuc
 
 def find_micro(y_true, y_pred, k, nSamples, fpr, tpr, rocAuc):
     # Computes micro-average ROC curve and area
     tprsMicro = []
     meanFpr = np.linspace(0, 1, nSamples)
-    fprMicro, tprMicro, _ = roc_curve(y_true, y_pred)
+    fprMicro, tprMicro, _ = roc_curve(y_true.ravel(), y_pred.ravel())
     tprsMicro.append(interp(meanFpr, fprMicro, tprMicro))
     tprsMicro[-1][0] = 0.
     # for j in range(k):
@@ -280,27 +312,48 @@ def find_macro(fpr, tpr, rocAuc, classes):
     tpr["macro"] = meanTpr
     rocAuc["macro"] = round(auc(fpr["macro"], tpr["macro"]), 2)
 
+def show_roc_curve_bokeh(fpr, tpr, rocAuc, classes, name, path, show_plt=False):
+    output_file("roc.html")
+    from bokeh.models import Legend, LegendItem
+    p = figure(plot_width=400, plot_height=400)
 
-def show_roc_curve(fpr, tpr, rocAuc, classes, name, path, show=False):
-    fig = plt.figure(figsize=[6, 4.5])
-    lw = 2
-    plt.plot(fpr["micro"], tpr["micro"],
-             label='micro-average ROC curve (area = {0:0.3f})'
-                   ''.format(rocAuc["micro"]), color='deeppink', linestyle=':', linewidth=4)
-    plt.plot(fpr["macro"], tpr["macro"],
-             label='macro-average ROC curve (area = {0:0.2f})'
-                   ''.format(rocAuc["macro"]),
-             color='navy', linestyle=':', linewidth=4)
-    '''
-    colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'lawngreen', 'purple'
-    'dimgrey', 'gold', 'darkcyan', 'crimson', 'darkgreen'])
-    for i, color in zip(range(classes.shape[0]), colors):
-        plt.plot(fpr[i], tpr[i], color=color, lw=lw,
-                 label='ROC curve of class {0} (area = {1:0.2f})'
-                       ''.format(i, rocAuc[i]["area"]))'''
-    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='grey',
-            alpha=.2)
-    plot_roc_grid('multi', name, path, fig, show=show)
+    # add a line renderer
+    r = p.multi_line([fpr["micro"],fpr["macro"],[0,1]], [tpr["micro"], tpr["macro"],[0,1]],
+                 color=["chocolate", "darkslateblue", "black"], alpha=[0.6, 0.6, 0.3], line_width=2)
+    legend = Legend(items=[
+        LegendItem(label='micro-average ROC curve (area = {0:0.3f})'
+                       ''.format(rocAuc["micro"]), renderers=[r], index=0),
+        LegendItem(label='macro-average ROC curve (area = {0:0.2f})'
+                       ''.format(rocAuc["macro"]), renderers=[r], index=1),
+    ])
+    p.add_layout(legend)
+    p.legend.location = "bottom_right"
+
+    show(p)
+
+def show_roc_curve_all(fpr, tpr, rocAuc, classes, name, path, show=False):
+    palette = cycle(sns.color_palette())
+    classes = np.asarray(classes)
+    for i in range(len(classes)):
+        fig = plt.figure(figsize=[6, 4.5])
+        lw = 2
+        plt.plot(fpr["micro"], tpr["micro"],
+                 label='micro-average ROC curve (area = {0:0.3f})'
+                       ''.format(rocAuc["micro"]), color='deeppink', linestyle=':', linewidth=4)
+        plt.plot(fpr["macro"], tpr["macro"],
+                 label='macro-average ROC curve (area = {0:0.2f})'
+                       ''.format(rocAuc["macro"]),
+                 color='navy', linestyle=':', linewidth=4)
+
+        #colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'lawngreen', 'purple'
+        #'dimgrey', 'gold', 'darkcyan', 'crimson', 'darkgreen', 'red', 'orange', 'green', 'blue', 'navy', 'brown', 'black', ])
+        #for i, color in zip(range(classes.shape[0]), colors):
+        plt.plot(fpr[i], tpr[i], color='aqua', lw=lw,
+                  label='ROC curve of class {0} (area = {1:0.2f})'
+                      ''.format(i+1, rocAuc[i]["area"]))
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='grey',
+                alpha=.2)
+        plot_roc_grid('multi', name+"cl-"+str(i+1), path, fig, show=show)
 
 def plot_roc_grid(type, name, path, fig, show=False):
     plt.xlabel('1 - Specificity')
@@ -395,7 +448,8 @@ def get_classification_report(y_true, y_pred, labels, name, title, show=True, sa
         if 'path' in kwargs:
             path = kwargs['path']
         plt.savefig(path + '/class_report_' + name + '.svg', format='svg', bbox_inches='tight')
-
+        matrix.to_csv(join(path, name + 'classification_report.csv'))
+        #classification_report_to_csv(cr, path, name=name)
     if show:
 
         plt.show()
@@ -626,7 +680,7 @@ def evaluate():
                                       save=SAVE,
                                       path=SAVE_PATH)
         if args.get_roc:
-            get_roc_curve(y_t, y_p, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+            get_roc_curve(y_true, y_p, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
         if args.cv:
             csv_path = args.cv
             dic = {(key, value) for (key, value) in zip(k, acc)}
@@ -653,16 +707,18 @@ def plot():
         his = pickle.load(open(args.file, 'rb'))
         if his_t == 'b':
             his_t = 'a'
-        plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name+" "+his_type[his_t]+" Plot", show=args.show_g)
+        plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name+"-"+his_type[his_t]+" Plot", show=args.show_g)
         if args.plot_his == 'b':
             his_t = 'l'
-            plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + " " + his_type[his_t] + " Plot", show=args.show_g)
+            plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + "-" + his_type[his_t] + " Plot", show=args.show_g)
     elif args.act is not None:
         MODEL_PATH = args.model_path
         DATA_PATH = args.data_path
+        if DATA_PATH is None:
+            DATA_PATH = IMG_PATH
         #model_path, img_path, target_size, layer_no, plot_size=(2,2))
         layer_no = args.act
-        get_act_map(MODEL_PATH, DATA_PATH, (224, 224), layer_no=layer_no)
+        get_act_map(MODEL_PATH, DATA_PATH, (224, 224), layer_no=layer_no, save=args.save, path=args.save_path, name=args.model_name + "-" + layer_no + "-act-map", show=args.show_g)
 
 # evaluate for finding model accuracy and prediction by running the model on test set
 # should have -t tag indicating one of the options
