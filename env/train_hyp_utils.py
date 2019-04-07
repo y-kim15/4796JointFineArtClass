@@ -1,13 +1,14 @@
 from os.path import join
 import os
-from shutil import copyfile
+from shutil import copyfile,copy
 import statistics
 import pandas as pd
 import json
 import pickle
 import sys
+from processing.clean_csv import create_dir
 
-DIR_PATH = "data"
+DIR_PATH = "/cs/tmp/yk30/"+"data"
 
 # make sub training set to fit for CV, n index of sub test set
 
@@ -15,17 +16,18 @@ DIR_PATH = "data"
 def make_sub_train(n):
     full_path = join(DIR_PATH, 'wikipaintings_full/wikipaintings_train')
     train_path = join(DIR_PATH, 'train_exp_'+str(n))
-    test_path = join(DIR_PATH, 'wiki_small2_'+str(n), 'small_train')
-    os.mkdir(train_path)
+    test_path = join(DIR_PATH, 'wiki_small_2_'+str(n), 'small_train')
+    create_dir(train_path)
     styles = os.listdir(full_path)
     for style in styles:
+        create_dir(join(train_path, style))
         s_full_works = os.listdir(join(full_path, style))
         s_test_works = os.listdir(join(test_path, style))
         for s_full in s_full_works:
             if s_full not in s_test_works:
                 src = join(full_path, style, s_full)
                 dest = join(train_path, style, s_full)
-                copyfile(src, dest)
+                copy(src, dest)
     return train_path
 
 
@@ -63,4 +65,3 @@ def get_opt_model(dir_path):
         sys.exit("Error in finding history!")
     except ValueError:
         sys.exit("Error in finding model file!")
-

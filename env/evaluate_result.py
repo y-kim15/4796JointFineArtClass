@@ -8,7 +8,7 @@ from matplotlib import colors
 import seaborn as sns
 from keras import metrics
 from progressbar import ProgressBar
-from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input, id_preprocess_input
+from processing.train_utils import imagenet_preprocess_input, wp_preprocess_input, id_preprocess_input, get_new_model
 from processing.read_images import count_files
 from os import listdir
 from os.path import join
@@ -104,7 +104,12 @@ def get_act_map(model_path, img_path, target_size, layer_no, plot_size=(4,4)):
 
 
 def get_y_prediction(model_path, test_path, top_k=1, target_size=(224, 224)):
-    model = load_model(model_path)
+    try:
+        model = load_model(model_path)
+    except ValueError:
+        model, _ = get_new_model(args.model_name, (224,224,3), None, None, None, 0, 1, 0)
+        model.load_weights(model_path)
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     model.metrics.append(metrics.top_k_categorical_accuracy)
     dico = get_dico()
     y_true = []
@@ -180,6 +185,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     path = None
     name = None
     if save:
@@ -607,6 +613,8 @@ def evaluate():
     if args.type == 'acc':
         y_t, y_p, y_true, y_pred, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K)
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
+        if args.model_name is not None:
+            name = name + '-' + args.model_name
         SHOW = args.show_g
 
 

@@ -2,6 +2,7 @@ import os
 import re
 import pandas
 import csv
+from progressbar import ProgressBar
 from processing.clean_csv import Clean, create_dir
 import imageio
 import math
@@ -9,6 +10,7 @@ import random
 from os.path import join, exists
 from random import shuffle
 from shutil import copyfile,move, copy, rmtree
+import time
 
 N_CLASSES = 25
 
@@ -89,7 +91,7 @@ def get_small_dataset(large_path, proportion, target_path, dir_name, summary_pat
         f.write("%s\n" % item)
     f.write("Total " + str(total))
     f.close()
-    return
+    return total
 
 
 def get_small_from_large_dataset(large_path, proportion, target_path, summary_path):
@@ -98,6 +100,10 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
     n_dest = int(round(1 / proportion))
     f.write("*********Summary by Directory*********\nProportion: " + str(proportion) + "\nNo dirs: " + str(n_dest) + "\n")
     f.close()
+    #s = count_files(large_path)
+    #print('Dividing to small dirs...')
+    #bar = ProgressBar(max_value=s)
+    #i = 0
     for i in range(n_dest):
         if exists(target_path + str(i)):
             rmtree(target_path + str(i))
@@ -113,7 +119,9 @@ def get_small_from_large_dataset(large_path, proportion, target_path, summary_pa
             dir_name = "small_" + d_type
             to_path = join(target_path + str(i), dir_name)
             create_dir(to_path)
-        get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
+        vv = get_small_dataset(large_split_path, proportion, target_path, dir_name, summary_path)
+        #i += vv
+        #bar.update(i)
 
 
 def count_files(path):
@@ -235,6 +243,24 @@ def generate_artist_file_system(path, dest_path):
                             join(dest_path, new_name, item))  # dest_mid_dir, new_name, item))
     print("File system created under data")
 
+def get_artist_info(train_path):
+    dict = {}
+    styles = os.listdir(train_path)
+    for s in styles:
+        files = os.listdir(join(train_path,s))
+        for f in files:
+            name = f.split('_')[0]
+            if name not in dict:
+                dict[name] = [s]
+            else:
+                dict[name].append(s)
+    keys = sorted(dict.keys())
+    with open("artist_style.csv", "wb") as outfile:
+        writer = csv.writer(outfile, delimiter = "\t")
+        writer.writerow(keys)
+        writer.writerows(zip(*[dict[key] for key in keys]))
+
+
 DIR_PATH = 'C:/Users/Kira Kim/Documents/cs4796'#os.path.dirname(os.path.realpath(__file__))
 # methods applied existing functions from rasta.python.utils.utils
 
@@ -293,16 +319,16 @@ if __name__ == '__main__':
     shuffle_data(name, new_train_path)
     generate_image_id_file("../data/val.txt", "../rasta/data/wikipaintings_full/wikipaintings_val", class_path, id=False )
     shuffle_data("../data/val.txt", "../data/val_mixed.txt")"""
-    #path = "../data/wikipaintings_full"
-    #dest_path = "../data/wiki_small_2_"
-    #cur_time = time.strftime("%d%m%y_%H%M")
-    #get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
+    path = "/cs/tmp/yk30/data/wikipaintings_full"
+    dest_path = "/cs/tmp/yk30/data/wiki_small_2_"
+    cur_time = time.strftime("%d%m%y_%H%M_for_cv")
+    get_small_from_large_dataset(path, 0.2, dest_path, "../summary_"+cur_time+".txt")
     #class_path = "../data/wikipaintings_class_labels.txt"
     #generate_image_id_file("../data/wikipaintings_full_image.csv", "../data/wikipaintings_full", class_path)
     #print(DIR_PATH)
     #split_test_training()
     #split_val_training()
-    import numpy as np
+    '''import numpy as np
     from keras.preprocessing.image import load_img
     DATA_PATH = join(DIR_PATH,'data/medium_train')
     s = np.array([0.,0.,0.])
@@ -313,7 +339,8 @@ if __name__ == '__main__':
         t += 1
 
     mean = s/t
-    print(mean)
+    print(mean)'''
+
     # path_val = "../../../../../scratch/yk30/wikipaintings_full/wikipaintings_val"
     # val_file_name = "val.txt"
     # generate_image_id_file(val_file_name, path_val, name)

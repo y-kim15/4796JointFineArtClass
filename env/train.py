@@ -23,8 +23,8 @@ config.gpu_options.allow_growth = True
 
 PATH = os.path.dirname(__file__)
 # options for data path
-lab = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train!/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
-lap = "data/wikipaintings_full2/wikipaintings_train!data/wikipaintings_full2/wikipaintings_val"
+lab = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train#/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
+lap = "data/wikipaintings_full/wikipaintings_train#data/wikipaintings_full/wikipaintings_val"
 # PARSING ARGUMENTS
 
 parser = argparse.ArgumentParser(description='Description')
@@ -58,7 +58,7 @@ parser.add_argument('-w', action="store_true", default=False, dest='add_wei', he
 
 args = parser.parse_args()
 print("Args: ", args)
-MODEL_DIR = "models/logs"
+MODEL_DIR = "/cs/tmp/yk30/models/logs"
 
 try:
     if args.model_type is not None:
@@ -95,10 +95,10 @@ changed = False
 if args.data_path != None:
     if args.data_path == 'lap':
         args.data_path = lap
-    else:
+    elif args.data_path == 'lab':
         args.data_path = lab
-    TRAIN_PATH = args.data_path.rsplit('!',1)[0]
-    VAL_PATH = args.data_path.rsplit('!',1)[1]
+    TRAIN_PATH = args.data_path.rsplit('#',1)[0]
+    VAL_PATH = args.data_path.rsplit('#',1)[1]
 else:
     TRAIN_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_train")#join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_train")##join(PATH, "data/wiki_small" + str(SAMPLE_N), "smalltrain")
     VAL_PATH = join(PATH, "data/wikipaintings_full", "wikipaintings_val")# join(PATH, "data", "id_medium_small_" + str(SAMPLE_N), "small_val")#
@@ -116,7 +116,12 @@ if train_type != 'empty':
         MODEL_PATH = args.model_path
 
     name = MODEL_PATH.rsplit('/', 1)[1].replace('hdf5', '')
-    model = load_model(MODEL_PATH)
+    try:
+        model = load_model(MODEL_PATH)
+    except ValueError:
+        model, _ = get_new_model(MODEL_TYPE, INPUT_SHAPE, REG, args.alpha, args.add_init, args.add_drop, args.pretrained, N_TUNE)
+        model.load_weights(MODEL_PATH)
+        changed = True
     print("no of layers : ", len(model.layers))
     name = get_model_name(SAMPLE_N, type=train_type, model_type=MODEL_TYPE, name=name, n_tune=N_TUNE)
     if train_type == 'tune':
@@ -146,12 +151,14 @@ else:
     if args.path != "":
         dir_path = args.path
     else:
-        dir_path = join("/cs/scratch/yk30/models",name)
+        dir_path = join("/cs/tmp/yk30/models",name)
 	#dir_path = join("models", name)
         create_dir(dir_path)
 
 if args.model_type is not None:
     model, changed = set_trainable_layers(model, N_TUNE)
+    if not changed and train_type=='tune':
+        changed = True
 if  args.rasta_model=='cust_resnet':
     model, changed = set_trainable_layers(model, N_TUNE)
 
@@ -175,8 +182,8 @@ if train_type == 'empty' or changed:
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='mean_squared_error')
     else:
         model.compile(optimizer=get_optimiser(OPT, LR, DECAY, MOM, N_EPOCHS), loss='categorical_crossentropy', metrics=['accuracy'])
-elif LR != 0.001:
-    K.set_value(model.optimizer.lr, LR)
+#elif LR != 0.001:
+#    K.set_value(model.optimizer.lr, LR)
 
 if args.path == "":
     save_summary(dir_path, name, model)
@@ -187,7 +194,7 @@ if args.path == "":
     model.save_weights(join(dir_path, '_ini_weights.h5'))
 
 tb = TensorBoard(log_dir=MODEL_DIR + "/" + name, histogram_freq=0, write_graph=True, write_images=True)
-earlyStop = EarlyStopping(monitor='val_loss', patience=3)
+earlyStop = EarlyStopping(monitor='val_loss', patience=5)
 start = time.time()
 add = ""
 if VAL_PATH != None:

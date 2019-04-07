@@ -2,7 +2,7 @@ from processing.clean_csv import create_dir
 from processing.train_utils import merge_two_dicts, get_best_comb_from_csv, save_ordered
 from train_hyp_utils import make_sub_train, cross_val_score, get_opt_model
 import os
-from os.path import join
+from os.path import join, exists
 import datetime
 import subprocess
 import time
@@ -39,7 +39,7 @@ FINAL_PATH = join(PATH, 'models')
 parser = argparse.ArgumentParser(description='Description')
 
 parser.add_argument('-t', action="store", default="params", dest='type', help='Type of Training [params|cv]')
-parser.add_argument('-cv', action="store", default=5, dest='fold', help='Set n-fold cv')
+parser.add_argument('-cv', action="store", default=5, dest='cv', help='Set n-fold cv')
 parser.add_argument('-j', action="store", default=None, dest='json_file', help='Path to json file containing parameter values')
 parser.add_argument('-s', action="store_true",default=False, dest='save', help='Save the output in directory') #if false, will only report the best on cmd line and json
 parser.add_argument('-m', action="store", dest='model', help='Name of architecture to use [vgg16|inceptionv3|resnet50]')
@@ -118,12 +118,15 @@ else:
     #except ValueError:
      #   sys.exit("ValueError: value of cv for fold should be defined.")
 
-    val_path = "data/wikipaintings_full/wikipaintings_val"
+    val_path = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_val"
     csv_path = join(FINAL_PATH, "_cv_fold_" + str(args.cv) + ".csv")
     for i in range(args.cv):
         print("Fold " + str(i+1) + "....")
-        train_path = make_sub_train(i)
-        test_path = join('data', 'wiki_small_2_' + str(i), 'small_train')
+        #train_path = make_sub_train(i)
+        train_path = '/cs/tmp/yk30/data/train_exp_'+str(i)
+        if not exists(train_path):
+            train_path = make_sub_train(i)
+        test_path = join('/cs/tmp/yk30','data', 'wiki_small_2_' + str(i), 'small_train')
         sub_dir = join(FINAL_PATH, 'train_' + str(i))
         os.mkdir(sub_dir)
         # execute

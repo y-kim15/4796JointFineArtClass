@@ -4,12 +4,11 @@ from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.applications.resnet50 import ResNet50
 from keras.initializers import glorot_uniform, VarianceScaling
 from keras.regularizers import l2
-#from keras.preprocessing.image import ImageDataGenerator
-from processing.keras_image_ext import ImageDataGenerator
+from keras.preprocessing.image import ImageDataGenerator
 from keras.constraints import MaxNorm
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, InputLayer, Input, \
     GlobalAveragePooling2D, UpSampling2D, BatchNormalization, Activation, ZeroPadding2D, AveragePooling2D
-from keras.optimizers import Adam, RMSprop, Adadelta, SGD
+from keras.optimizers import Adam, RMSprop, Adadelta, SGD, Nadam
 from keras import backend as K
 from rasta.custom_resnets import *
 from rasta.alexnet import decaf,alexnet
@@ -81,21 +80,22 @@ def get_autoencoder1(input_shape,  add_reg, alpha, dropout, pretrained=False):
 
     return input, decoded
 
-def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
-    if not pretrained:
-        base_model = VGG16(include_top=False, weights=None, input_shape=input_shape)
-        # return base_model
+def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained):
+    if pretrained == 0:
+        base_model = VGG16(include_top=False, weights=None, input_shape=input_shape, pooling='avg')
+        # when == 2, use the original whole model!
+    elif pretrained == 2:
+        base_model = VGG16(include_top=True, weights='imagenet', input_shape=input_shape)
     else:
-        base_model = VGG16(include_top=False, weights='imagenet', input_shape=input_shape)
+        base_model = VGG16(include_top=False, weights='imagenet', input_shape=input_shape, pooling='avg')
 
     x = base_model.output
-    x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
     if add_reg is not None and dropout > 0:
         x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    elif add_reg is None and dropout > 0:
-        x = Dense(128, activation='relu')(x)
-    if dropout > 0:
+    #elif add_reg is None and dropout > 0:
+     #   x = Dense(128, activation='relu')(x)
+    if dropout > 0 and pretrained == 2:
         x = Dropout(dropout)(x)
     #else:
     #    x = Dense(128, activation='relu')(x)
@@ -107,15 +107,15 @@ def get_vgg16(input_shape, add_reg, alpha, dropout, pretrained=True):
     return base_model, output
 
 
-def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
-    if not pretrained:
-        base_model = InceptionV3(include_top=True, weights=None, input_shape=input_shape)
-
+def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained):
+    if pretrained == 0:
+        base_model = InceptionV3(include_top=False, weights=None, input_shape=input_shape, pooling='avg')
+    elif pretrained == 2:
+        base_model = InceptionV3(include_top=True, weights='imagenet', input_shape=input_shape)
     else:
-        base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=input_shape)
+        base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=input_shape, pooling='avg')
 
     x = base_model.output
-    x = GlobalAveragePooling2D()(x)
     # let's add a fully-connected layer
     # added below
     if add_reg is not None and dropout > 0:
@@ -135,19 +135,22 @@ def get_inceptionv3(input_shape, add_reg, alpha, dropout, pretrained=True):
     return base_model, output
 
 
-def get_resnet50(input_shape, add_reg, alpha, dropout=0.2, pretrained=True):
-    if not pretrained:
-        base_model = ResNet50(input_shape=input_shape, weights=None, include_top=False, pooling='avg')
+def get_resnet50(input_shape, add_reg, alpha, dropout, pretrained):
+    if pretrained == 0:
+        base_model = ResNet50(input_shape=input_shape, weights=None, include_top=False)
+    elif pretrained == 2:
+        base_model = ResNet50(input_shape=input_shape, weights='imagenet', include_top=True)
     else:
-        base_model = ResNet50(input_shape=input_shape, weights='imagenet', include_top=False, pooling='avg')
-
+        base_model = ResNet50(input_shape=input_shape, weights='imagenet', include_top=False)
     x = base_model.output
-    #x = GlobalAveragePooling2D(data_format='channels_last')(x)
+    if pretrained < 2:
+        x = AveragePooling2D(pool_size=(7,7),strides=(7,7), data_format='channels_last')(x)
+        x = GlobalAveragePooling2D(data_format='channels_last')(x)
     # added below
     if add_reg is not None and dropout > 0:
         x = Dense(128, activation='relu', kernel_regularizer=add_reg(alpha))(x)
-    elif add_reg is None and dropout > 0:
-        x = Dense(128, activation='relu')(x)
+    #elif add_reg is None and dropout > 0:
+    #    x = Dense(128, activation='relu')(x)
     if dropout > 0:
         x = Dropout(dropout)(x)
     #else:
@@ -167,39 +170,20 @@ get_model = {
     'auto2': get_autoencoder2
 }
 
-def get_rasta_model(model_name, n_train, reg, alpha, init, drop):
-    K.set_image_data_format('channels_last')
-    base_model = None
-    if model_name =='alexnet_empty':
-        model = alexnet(weights=None)
-        for layer in model.layers:
-            layer.trainable = True
-    elif model_name=='custom_resnet':
-        model = custom_resnet(add_reg=reg, alpha=alpha, init=init, n=n_train, dp_rate=drop)
-    return model
 
 def get_new_model(model_type, input_shape, reg, alpha, init, drop, pretrained, n_train):
     data_type = True
-    if int(pretrained)==1:
-        tr = True
-    else:
-        tr = False
+    #if int(pretrained) > 0:
+    #    tr = True
+    #else:
+    #    tr = False
     if model_type in get_model:
-        base_model, output = get_model[model_type](input_shape, reg, alpha, drop, tr)
+        base_model, output = get_model[model_type](input_shape, reg, alpha, drop, pretrained)
         if re.search('auto*', model_type):
             data_type = False
             model = Model(inputs=base_model, outputs=output)
         else:
             model = Model(inputs=base_model.input, outputs=output)
-    else: # rasta
-        model = get_rasta_model(model_type, n_train, reg, alpha, init, drop)
-    if int(pretrained)==2:
-        WEIGHTS_PATH_NO_TOP = 'https://github.com/qubvel/classification_models/releases/download/0.0.1/resnet50_imagenet_11586_no_top.h5'
-        weights_path = get_file('resnet50_imagenet_11586_no_top.h5',#'resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5',
-                                WEIGHTS_PATH_NO_TOP,
-                                cache_subdir='models',
-                                md5_hash='a268eb855778b3df3c7506639542a6af')
-        model.load_weights(weights_path,by_name=True)
     return model, data_type
 
 def copy_range(old_model, new_model, ran):
@@ -256,7 +240,8 @@ def set_trainable_layers(model, layers):
         try:
             if ',' not in layers:
                 v = int(layers)
-                if v > 0 and v < len(model.layers):
+                # only think it as last top n layers if v <= 5
+                if v > 0 and v < len(model.layers) and v <= 5:
                     for layer in model.layers[:len(model.layers) - v + 1]:
                         if layer.trainable == True:
                             changed = True
@@ -270,6 +255,19 @@ def set_trainable_layers(model, layers):
                         if layer.trainable == False:
                             changed = True
                         layer.trainable = True
+                else:
+                    for layer in model.layers[:v]:
+                        if layer.trainable == True:
+                            changed = True
+                        layer.trainable = False
+                    for layer in model.layers[v+1:]:
+                        if layer.trainable == True:
+                            changed = True
+                        layer.trainable = False
+                    if model.layers[v].trainable == False:
+                        changed = True
+                    model.layers[v].trainable = True
+
             else:
                 ls = layers.split(',')
                 for n, i in zip(range(len(ls)), ls):
@@ -294,14 +292,14 @@ def set_trainable_layers(model, layers):
         try:
             if ',' in layers:
                 multi = layers.split(',')
-                if '-' in multi[0]:
+                '''if '-' in multi[0]:
                     start = int(multi[0].split('-')[0])
                 else:
                     start = multi[0]
                 if '-' in multi[len(multi)-1]:
                     end = int(multi[len(multi)-1].split('-')[1])
                 else:
-                    end = multi[len(multi)-1]
+                    end = int(multi[len(multi)-1])
                 for layer in model.layers[0:start]:
                     if layer.trainable == True:
                         changed = True
@@ -309,22 +307,26 @@ def set_trainable_layers(model, layers):
                 for layer in model.layers[end + 1:]:
                     if layer.trainable == True:
                         changed = True
-                    layer.trainable = False
+                    layer.trainable = False'''
                 for i in range(len(multi)):
+                    print("total layers is ", str(len(model.layers)))
                     if '-' in multi[i]:
                         start = int(multi[i].split('-')[0])
                         end = int(multi[i].split('-')[1])
+                        print("start is ", str(start))
+                        print("end is ", str(end))
                         if start >= len(model.layers) or end >= len(
                                 model.layers) or start < 0 or end < 0 or start >= end:
+                            print("raise error! invalid index")
                             raise ValueError
                         for layer in model.layers[start:end + 1]:
                             if layer.trainable == False:
                                 changed = True
                             layer.trainable = True
                     else:
-                        if model.layers[multi[i]].trainable == False:
+                        if model.layers[int(multi[i])].trainable == False:
                             changed = True
-                        model.layers[multi[i]].trainable = True
+                        model.layers[int(multi[i])].trainable = True
 
             else:
                 start = int(layers.split('-')[0])
@@ -393,22 +395,12 @@ def random_crop(x, random_crop_size, sync_seed=None, **kwargs):
 
 def get_generator(path, batch_size, target_size, horizontal_flip, train_type, function):
     if function == 'vgg16' or function == 'resnet50':
-        datagen = ImageDataGenerator(width_shift_range=.15, height_shift_range=.15, horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
+        datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=imagenet_preprocess_input)
     elif re.search('auto*', function):
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=id_preprocess_input)
     else:
         datagen = ImageDataGenerator(horizontal_flip=horizontal_flip, preprocessing_function=scale_preprocess_input)
-    datagen.config['random_crop_size'] = (224, 224)
-    datagen.config['center_crop_size'] = (224, 224)
-    datagen.set_pipeline([random_crop, center_crop])
-    dgdx = datagen.flow_from_directory(path, class_mode='categorical', batch_size=batch_size)
 
-    # you can now fit a generator as well
-    datagen.fit_generator(dgdx, nb_iter=10)
-
-    # here we sychronize two generator and combine it into one
-    generator = dgdx
-    '''
     if train_type:
         generator = datagen.flow_from_directory(
             path,
@@ -423,7 +415,6 @@ def get_generator(path, batch_size, target_size, horizontal_flip, train_type, fu
             batch_size=batch_size,
             seed=0,
             class_mode='input')
-    print("total size : ", generator.n)'''
     return generator
 
 
@@ -461,7 +452,8 @@ optimiser = {
     'adam': Adam,
     'rmsprop': RMSprop,
     'adadelta': Adadelta,
-    'sgd': SGD
+    'sgd': SGD,
+    'nadam': Nadam
 }
 
 
