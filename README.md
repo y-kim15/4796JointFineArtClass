@@ -7,17 +7,43 @@ To be run in GPU supported Scientific Linux lab clients
 Note that this automatically installs tensorflow-gpu
 
 ### To download image files
-Image files for training was downloaded from Lecoutre et al. source of RASTA. Using their stored data:
+Image files for training was downloaded from Lecoutre et al. source of RASTA. Full dataset can be downloaded:
+Note it has a total size of 18GB so would recommend to store in the scratch space.
+* Full test set (large) was used for all the test results reported. Testing takes around 8-10 minutes from the lab machine
 
+  cd data
+  wget www.lamsade.dauphine.fr/~bnegrevergne/webpage/software/rasta/wikipaintings_full.tgz
+  tar xzvf wikipaintings_full.tgz
+  cd ../
+
+* small wikipaintings data set can be downloaded from here.
+
+
+
+
+### Model Evaluation
+#### Evaluate the accuracy of model
+    python3 evaluate_result.py -t acc -m <model_path> [-d <data_path> -cm --report --roc --show -s]
+There are example images which can be used for prediction:
+
+
+#### Predict from a given image
+    python3 evaluate_result.py -t pred -m <model_path> -d <image_path>
 
 ### Model Training
 For all training, the average time taken for 1 epoch is 50 minutes.
+Should have dataset saved under env/data/as <wikipaintings_full>/<wikipaintings_train> and <wikipaintings_full>/<wikipaintings_val>
+or add a new dataset with the same file hierarchy and pass on cmd line as:
+    -dp data/<>/<\_train>#data/<>/<\_val>
+Each train/val/test directory should contain 25 subdirectories for classes with corresponding images
+
 #### Train a new model
     python3 train.py --model_type <model_type> -dp <# separated path to train and val set>
 #### Retrain an existing model
     python3 train.py -t retrain --model_type <model_type> -m <model_path>
 #### Tune an existing model
     python3 train.py -t tune --model_type <model_type> -m <model_path> -n <n_tune> -ln <layers_to_copy>
+
 
 To view tensorboard for monitoring the training process use:
     tensorboard --logdir <path>
@@ -69,11 +95,7 @@ deprecated:
 #### Example
     python3 train.py --model_type vgg16 -tr 1 -e 3 -b 30 -n 3
 
-### Model Evaluation
-#### Evaluate the accuracy of model
-    python3 evaluate_result.py -t acc -m <model_path> [-d <data_path> -cm --report --roc --show -s]
-#### Predict from a given image
-    python3 evaluate_result.py -t pred -m <model_path> -d <image_path>
+
 #### Plot history plot
     python3 evaluate_result.py --his b -f <history_file_path> [--show -s]
 #### Plot activation maps

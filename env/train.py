@@ -55,13 +55,13 @@ print("Args: ", args)
 ####### Decode cmd line arguments #########
 # TODO
 MODEL_DIR = join(PATH, 'models', 'logs')#"/cs/tmp/yk30/models/logs"
-
+MODEL_TYPE = args.model_type
 train_type = args.train_type
 BATCH_SIZE = args.batch_size
 N_EPOCHS = args.epochs
 flip = args.horizontal_flip
 N_TUNE = args.n_layers_trainable
-SAMPLE_N = args.sample_n
+SAMPLE_N = 'full'
 OPT = args.optimiser
 LR = args.lr
 DECAY = args.add_decay
@@ -145,8 +145,6 @@ if args.model_type is not None:
     model, changed = set_trainable_layers(model, N_TUNE)
     if not changed and train_type=='tune':
         changed = True
-if  args.rasta_model=='cust_resnet':
-    model, changed = set_trainable_layers(model, N_TUNE)
 
 
 params = vars(args)
