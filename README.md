@@ -7,14 +7,18 @@ To be run in GPU supported Scientific Linux lab clients
 Note that this automatically installs tensorflow-gpu
 
 ### To download image files
-Image files for training was downloaded from Lecoutre et al. source of RASTA. Full dataset can be downloaded:
+Image files for training was downloaded from Lecoutre et al. source of [RASTA](https://github.com/bnegreve/rasta) where full credits are given as stated in the report,
+that the project has taken the existing work as a basis to extend on.
+The full dataset can be downloaded:
 Note it has a total size of 18GB so would recommend to store in the scratch space.
 * Full test set (large) was used for all the test results reported. Testing takes around 8-10 minutes from the lab machine
 
+````
   cd data
   wget www.lamsade.dauphine.fr/~bnegrevergne/webpage/software/rasta/wikipaintings_full.tgz
   tar xzvf wikipaintings_full.tgz
   cd ../
+````
 
 ### Model Evaluation
 #### Evaluate the accuracy of model on small test set
@@ -75,9 +79,14 @@ There are example images which can be used for prediction stored in data/images 
 
 ### Model Training
 For all training, the average time taken for 1 epoch is 50 minutes.
-Should have dataset saved under env/data/as <wikipaintings_full>/<wikipaintings_train> and <wikipaintings_full>/<wikipaintings_val>
+Should have dataset saved under env/data/  as
+
+    <wikipaintings_full>/<wikipaintings_train> and <wikipaintings_full>/<wikipaintings_val>
+
 or add a new dataset with the same file hierarchy and pass on cmd line as:
+
     -dp data/<>/<\_train>#data/<>/<\_val>
+
 Each train/val/test directory should contain 25 subdirectories for classes with corresponding images
 
 #### Train a new model
