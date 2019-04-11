@@ -101,15 +101,15 @@ Example run:
 * Default image path for an image to predict on, generate activation map from
 
 ````
-  usage: evaluate_result.py [-h] [-t TYPE] [-cv CV] [-m MODEL_PATH]
+usage: evaluate_result.py [-h] [-t TYPE] [-cv CV] [-m MODEL_PATH]
                           [--m_type {resnet,vgg}] [-d DATA_PATH] [-ds {f,s}]
-                          [-dp] [-k TOP_K] [-cm] [--report] [--show] [-s]
-                          [--save SAVE_PATH] [--his PLOT_HIS] [-f FILE]
+                          [-k TOP_K] [-cm] [--cm_type] [--report] [--show]
+                          [-s] [--save SAVE_PATH] [--his PLOT_HIS] [-f FILE]
                           [--model_name MODEL_NAME] [--act ACT] [--roc]
 
-  Description
+Description
 
-  optional arguments:
+optional arguments:
   -h, --help            show this help message and exit
   -t TYPE               Type of Evaluation [acc-predictive accuracy of model,
                         pred-predict an image][acc|pred]
@@ -123,6 +123,7 @@ Example run:
   -ds {f,s}             Choose the size of test set, full or small
   -k TOP_K              Top-k accuracy to compute
   -cm                   Get Confusion Matrix
+  --cm_type             Get un-labelled Confusion Matrix
   --report              Get Classification Report
   --show                Display graphs
   -s                    Save graphs

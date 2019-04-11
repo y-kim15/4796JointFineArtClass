@@ -41,6 +41,7 @@ parser.add_argument('-d', action="store", dest="data_path", help="Path of test d
 parser.add_argument('-ds', action="store", dest="data_size", default= 's', choices=['f', 's'], help="Choose the size of test set, full or small")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
+parser.add_argument('--cm_type', action="store_true", dest='cm_type', default=False, help='Get un-labelled Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
                     help='Get Classification Report')
 parser.add_argument('--show', action="store_true", dest='show_g', default=False, help='Display graphs')
@@ -192,14 +193,18 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
         fmt = '.2f'
     else:
         fmt = 'd'
-
-    plt.title("Confusion matrix")
+    if 'cm_type' in kwargs:
+        unlabelled = kwargs['cm_type']
     classNames = [str(x) for x in list(dico.keys())]
     cm = pd.DataFrame(cm, columns=classNames, index=classNames)
-    sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
-    #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
+    if not unlabelled:
+        plt.title("Confusion matrix")
+        sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
+
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+    else:
+        sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     path = None
     name = None
     if save:
@@ -527,8 +532,7 @@ def decode_image_autoencoder(model_path, img_path, target_size):
 def get_dico():
     classes = []
     PATH = os.path.dirname(__file__)
-    #directory = join(PATH, 'data/wikipaintings_small/wikipaintings_train')
-    directory = "/cs/tmp/yk30/data/wikipaintings_full/wikipaintings_train"
+    directory = join(PATH, 'data/wikipaintings_small/wikipaintings_test')
     for subdir in sorted(os.listdir(directory)):
         if os.path.isdir(os.path.join(directory, subdir)):
             classes.append(subdir)
@@ -586,7 +590,7 @@ def evaluate():
         y_t, y_p, y_true, y_pred, k, acc = get_acc(MODEL_PATH, DATA_PATH, k=K, save=SAVE, path=SAVE_PATH, name=name)
 
         if args.get_cm:
-            cm = get_confusion_matrix(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name)
+            cm = get_confusion_matrix(y_true, y_pred, show=SHOW, save=SAVE, path=SAVE_PATH, name=name, cm_type=args.cm_type)
         if args.get_class_report:
             classes = get_dico().keys()
             get_classification_report(y_true, y_pred, classes, name, 'classification report: ' + name, show=SHOW,
