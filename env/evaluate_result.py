@@ -39,7 +39,6 @@ parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MOD
 parser.add_argument('--m_type', action="store", dest='model_type', choices=['resnet', 'vgg'], help="Choose the type of ready trained model to use for evaluation/prediction")
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
 parser.add_argument('-ds', action="store", dest="data_size", default= 's', choices=['f', 's'], help="Choose the size of test set, full or small")
-parser.add_argument('-dp', action="store_true", dest='lab', help="Set to test in lab")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
 parser.add_argument('--report', action="store_true", dest='get_class_report', default=False,
@@ -572,8 +571,6 @@ def evaluate():
     else:
         SAVE_PATH = None
     if args.type == 'acc':
-        if args.lab:
-            PRE_PATH = '/cs/tmp/yk30/'
         if args.data_path is not None:
             DATA_PATH = args.data_path
         else:

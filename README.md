@@ -29,13 +29,15 @@ For quick run of all tests below, use:
 ````
 
 This will evaluate the model accuracy on small test set with confusion matrices and classification report, make prediction on an image, plot history and activation maps.
+
 N/B Please ensure tkinter is available for plot generation.
 
 #### Evaluate the accuracy of model on small test set
 The small wikipaintings test data set from RASTA are stored in data/wikipaintings_small/wikipaintings_test and are set as default test path.
 The small test set contains around 10 images per class and takes around 15 seconds to test. Note that model evaluation results analysed in the report are using the **full** test set
 - hence the outcome in terms of accuracy, confusion matrix may differ.
--s flag with -t acc will also save the generated accuracy results to json file
+
+Adding a *-s* flag with *-t acc* will also save the generated accuracy results to json file.
 
 Categorical accuracy for Small *wikipaintings_test* set:
 
@@ -56,7 +58,7 @@ Categorical accuracy for Large *wikipaintings_test* set:
 
     python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc --show] -s
 
-To use the large wikipaintings test set for full evaluation, pass the path to wikipaintings_full/wikipaintings_test using -d
+To use the large wikipaintings test set for full evaluation, pass the path to *wikipaintings_full/wikipaintings_test* using *-d*
 
     python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc -show -s]
 
@@ -119,7 +121,6 @@ Example run:
                         evaluation/prediction
   -d DATA_PATH          Path of test data
   -ds {f,s}             Choose the size of test set, full or small
-  -dp                   Set to test in lab
   -k TOP_K              Top-k accuracy to compute
   -cm                   Get Confusion Matrix
   --report              Get Classification Report
@@ -156,18 +157,21 @@ Each train/val/test directory should contain 25 subdirectories for classes with 
     python3 train.py -t tune --model_type <model_type> -m <model_path> -n <n_tune> -ln <layers_to_copy>
 
 #### Example
-````    
-        # train a new VGG model, pretrained with its top dense layers replaced with newly initialised dense layers,
-        # setting top 3 layers trainable with batch size 30 and epoch 3 and create a directory with all model related files under
-        # /cs/scratch/<id>/models. Add class weights.
+train a new VGG model, pretrained with its top dense layers replaced with newly initialised dense layers,
+setting top 3 layers trainable with batch size 30 and epoch 3 and create a directory with all model related files under
+/cs/scratch/<id>/models. Add class weights.
+
         python3 train.py --model_type vgg16 -tr 1 -e 3 -b 30 -n 3 --new_p /cs/scratch/<id>/models -w
-        # retrain the saved model, setting layers indexed 110 to 120 inclusive to be trainable with initial learning rate of 0.00001 of Adam
-        # optimiser with factor of 10 decay, with batch size 60, epoch 10
+
+Retrain the saved model, setting layers indexed 110 to 120 inclusive to be trainable with initial learning rate of 0.00001 of Adam
+optimiser with factor of 10 decay, with batch size 60 and epoch 10.
+
         python3 train.py -t retrain -m models/resnet50_model/resnet50_06-0.517-2.090.hdf5 -e 10 -b 60 -n 110-120 -lr 0.00001 --decay rate
-````
+
 
 To view tensorboard for monitoring the training process use:
-    tensorboard --logdir <path>
+
+    tensorboard --logdir <models/logs/path_to_dir_saved_with_events_file>
 
 
 ````
