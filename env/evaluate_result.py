@@ -21,12 +21,12 @@ from bokeh.plotting import figure, show, output_file
 import pandas as pd
 import os, json, pickle, csv, math, argparse
 
+# resnet model
+DEFAULT_MODEL_PATH = "models/resnet50_model/resnet50_06-0.517-2.090.hdf5"
+VGG_MODEL_PATH = "models/vgg16_model/vgg16_01-0.520-1.567.hdf5"
 
-MODEL_PATH = "models/resnet50_2-4-15-35_empty_layers-3-s-0/09-0.487._retrain_layers-172-s-1/13-0.354._retrain_layers-168,172,178-s-2/12-0.375.hdf5"
-    #"models/resnet50_1-24-13-58_empty_tune-3-no-0/retrain-tune-3/19-0.343._retrain_layers-3-s-1/12-0.408.hdf5"
 DEFAULT_IMG_PATH = "data/van-gogh_sunflowers.jpg"
-
-DEFAULT_MODEL_PATH = MODEL_PATH
+DEFAULT_TEST_PATH = "data/wikipaintings_small/wikipaintings_test"
 DEFAULT_SAVE_PATH = "models/eval"
 N_CLASSES = 25
 
@@ -37,8 +37,9 @@ parser = argparse.ArgumentParser(description='Description')
 parser.add_argument('-t', action="store", dest='type', help='Type of Evaluation [acc-predictive accuracy of model, pred-predict an image][acc|pred]')
 parser.add_argument('-cv', action="store", dest='cv', help='Evaluate Cross Validation Output and Save [path to csv to save] to be used by train_hyp' )
 parser.add_argument('-m', action="store", dest='model_path', default=DEFAULT_MODEL_PATH, help='Path of the model file')
+parser.add_argument('--m_type', action="store", dest='model_type', choices=['resnet', 'vgg'], help="Choose the type of ready trained model to use for evaluation/prediction")
 parser.add_argument('-d', action="store", dest="data_path", help="Path of test data")
-parser.add_argument('-ds', action="store", dest="data_size", choices=['f', 's'], help="Choose the size of test set, full or small")
+parser.add_argument('-ds', action="store", dest="data_size", default= 's', choices=['f', 's'], help="Choose the size of test set, full or small")
 parser.add_argument('-dp', action="store_true", dest='lab', help="Set to test in lab")
 parser.add_argument('-k', action='store', dest='top_k', default='1,3,5', help='Top-k accuracy to compute')
 parser.add_argument('-cm', action="store_true", dest='get_cm', default=False, help='Get Confusion Matrix')
@@ -648,7 +649,13 @@ def write_to_csv(path, data, type):
 # main method decoding user command line options and use respective method calls
 # in the case of -t acc or pred only
 def evaluate():
-    MODEL_PATH = args.model_path
+    if args.model_path is None:
+        if args.model_type is None or args.model_type=='resnet':
+            MODEL_PATH = DEFAULT_MODEL_PATH
+        elif args.model_type=='vgg':
+            MODEL_PATH = VGG_MODEL_PATH
+    else:
+        MODEL_PATH = args.model_path
     PRE_PATH = ''
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
@@ -665,8 +672,8 @@ def evaluate():
         else:
             if args.data_size is not None and args.data_size=='f':
                 DATA_PATH = PRE_PATH + "data/wikipaintings_full/wikipaintings_test"
-            else:
-                DATA_PATH = PRE_PATH + "data/wikipaintings_small/wikipaintings_test"
+            elif args.data_size == 's':
+                DATA_PATH = DEFAULT_TEST_PATH
 
         name = MODEL_PATH.rsplit('/', 1)[1].replace('.hdf5', '')
         if args.model_name is not None:

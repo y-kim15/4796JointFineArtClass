@@ -16,19 +16,58 @@ Note it has a total size of 18GB so would recommend to store in the scratch spac
   tar xzvf wikipaintings_full.tgz
   cd ../
 
-* small wikipaintings data set can be downloaded from here.
-
-
-
-
 ### Model Evaluation
-#### Evaluate the accuracy of model
-    python3 evaluate_result.py -t acc -m <model_path> [-d <data_path> -cm --report --roc --show -s]
-There are example images which can be used for prediction:
-
+#### Evaluate the accuracy of model on small test set
+The small wikipaintings test data set from RASTA are stored in data/wikipaintings_small/wikipaintings_test and are set as default test path.
+    python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc --show -s]
+To use the large wikipaintings test set for full evaluation, pass the path to wikipaintings_full/wikipaintings_test using -d
+    python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc -show -s]
 
 #### Predict from a given image
-    python3 evaluate_result.py -t pred -m <model_path> -d <image_path>
+There are example images which can be used for prediction stored in data/images which the models have not seen before from train/val/test
+    python3 evaluate_result.py -t pred -m <model_path> -d data/images/<image_file_name>
+
+#### Plot history plot
+    python3 evaluate_result.py --his b -f <history_file_path> [--show -s]
+#### Plot activation maps
+    python3 evaluate_result.py -m <model_path> -d <image_path> --act <layer_no/name> [--show -s]
+
+* Default model_path is the saved latest optimal model
+* Default image path for an image to predict on, generate activation map from
+
+  ```
+  usage: evaluate_result.py [-h] [-t TYPE] [-cv CV] [-m MODEL_PATH]
+                            [-d DATA_PATH] [-ds {f,s}] [-dp] [-k TOP_K] [-cm]
+                            [--report] [--show] [-s] [--save SAVE_PATH]
+                            [--his PLOT_HIS] [-f FILE] [--model_name MODEL_NAME]
+                            [--act ACT] [--roc]
+
+  Description
+
+  optional arguments:
+    -h, --help            show this help message and exit
+    -t TYPE               Type of Evaluation [acc-predictive accuracy of model,
+                          pred-predict an image][acc|pred]
+    -cv CV                Evaluate Cross Validation Output and Save [path to csv
+                          to save] to be used by train_hyp
+    -m MODEL_PATH         Path of the model file
+    -d DATA_PATH          Path of test data
+    -ds {f,s}             Choose the size of test set, full or small
+    -dp                   Set to test in lab
+    -k TOP_K              Top-k accuracy to compute
+    -cm                   Get Confusion Matrix
+    --report              Get Classification Report
+    --show                Display graphs
+    -s                    Save graphs
+    --save SAVE_PATH      Specify save location
+    --his PLOT_HIS        Plot history, choose which to plot [l|a|b (default)]
+    -f FILE               Name of history file to plot: Reqruied for --his
+    --model_name MODEL_NAME
+                          Model types/name: Required for --his
+    --act ACT             Visualise activation function of layer [layer name or
+                          index]
+    --roc                 Get Roc Curve
+  ```
 
 ### Model Training
 For all training, the average time taken for 1 epoch is 50 minutes.
@@ -43,7 +82,6 @@ Each train/val/test directory should contain 25 subdirectories for classes with 
     python3 train.py -t retrain --model_type <model_type> -m <model_path>
 #### Tune an existing model
     python3 train.py -t tune --model_type <model_type> -m <model_path> -n <n_tune> -ln <layers_to_copy>
-
 
 To view tensorboard for monitoring the training process use:
     tensorboard --logdir <path>
@@ -95,48 +133,6 @@ deprecated:
 #### Example
     python3 train.py --model_type vgg16 -tr 1 -e 3 -b 30 -n 3
 
-
-#### Plot history plot
-    python3 evaluate_result.py --his b -f <history_file_path> [--show -s]
-#### Plot activation maps
-    python3 evaluate_result.py -m <model_path> -d <image_path> --act <layer_no/name> [--show -s]
-
-* Default model_path is the saved latest optimal model
-* Default image path for an image to predict on, generate activation map from
-
-```
-usage: evaluate_result.py [-h] [-t TYPE] [-cv CV] [-m MODEL_PATH]
-                          [-d DATA_PATH] [-ds {f,s}] [-dp] [-k TOP_K] [-cm]
-                          [--report] [--show] [-s] [--save SAVE_PATH]
-                          [--his PLOT_HIS] [-f FILE] [--model_name MODEL_NAME]
-                          [--act ACT] [--roc]
-
-Description
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -t TYPE               Type of Evaluation [acc-predictive accuracy of model,
-                        pred-predict an image][acc|pred]
-  -cv CV                Evaluate Cross Validation Output and Save [path to csv
-                        to save] to be used by train_hyp
-  -m MODEL_PATH         Path of the model file
-  -d DATA_PATH          Path of test data
-  -ds {f,s}             Choose the size of test set, full or small
-  -dp                   Set to test in lab
-  -k TOP_K              Top-k accuracy to compute
-  -cm                   Get Confusion Matrix
-  --report              Get Classification Report
-  --show                Display graphs
-  -s                    Save graphs
-  --save SAVE_PATH      Specify save location
-  --his PLOT_HIS        Plot history, choose which to plot [l|a|b (default)]
-  -f FILE               Name of history file to plot: Reqruied for --his
-  --model_name MODEL_NAME
-                        Model types/name: Required for --his
-  --act ACT             Visualise activation function of layer [layer name or
-                        index]
-  --roc                 Get Roc Curve
-```
 
 Note the below guideline is described for completeness only for cross validation as the implementation
 was used extensively due to time constraints. Cross validation implementation also requires predefined smaller dataset
