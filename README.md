@@ -19,12 +19,16 @@ Note it has a total size of 18GB so would recommend to store in the scratch spac
 ### Model Evaluation
 #### Evaluate the accuracy of model on small test set
 The small wikipaintings test data set from RASTA are stored in data/wikipaintings_small/wikipaintings_test and are set as default test path.
+
     python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc --show -s]
+
 To use the large wikipaintings test set for full evaluation, pass the path to wikipaintings_full/wikipaintings_test using -d
+
     python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc -show -s]
 
 #### Predict from a given image
-There are example images which can be used for prediction stored in data/images which the models have not seen before from train/val/test
+There are example images which can be used for prediction stored in data/images which the models have not seen before from train/val/test.
+
     python3 evaluate_result.py -t pred -m <model_path> -d data/images/<image_file_name>
 
 #### Plot history plot
@@ -35,7 +39,7 @@ There are example images which can be used for prediction stored in data/images 
 * Default model_path is the saved latest optimal model
 * Default image path for an image to predict on, generate activation map from
 
-  ```
+````
   usage: evaluate_result.py [-h] [-t TYPE] [-cv CV] [-m MODEL_PATH]
                             [-d DATA_PATH] [-ds {f,s}] [-dp] [-k TOP_K] [-cm]
                             [--report] [--show] [-s] [--save SAVE_PATH]
@@ -67,7 +71,7 @@ There are example images which can be used for prediction stored in data/images 
     --act ACT             Visualise activation function of layer [layer name or
                           index]
     --roc                 Get Roc Curve
-  ```
+````
 
 ### Model Training
 For all training, the average time taken for 1 epoch is 50 minutes.
