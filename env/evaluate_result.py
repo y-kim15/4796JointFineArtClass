@@ -3,9 +3,7 @@ from keras.preprocessing.image import load_img, img_to_array
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, roc_curve, auc
 import matplotlib
-matplotlib.use("agg")
 import matplotlib.pyplot as plt
-matplotlib.rcParams.update({'font.size': 8})
 from matplotlib import colors
 import seaborn as sns
 from keras import metrics
@@ -28,6 +26,7 @@ VGG_MODEL_PATH = "models/vgg16_model/vgg16_01-0.520-1.567.hdf5"
 DEFAULT_IMG_PATH = "data/van-gogh_sunflowers.jpg"
 DEFAULT_TEST_PATH = "data/wikipaintings_small/wikipaintings_test"
 DEFAULT_SAVE_PATH = "models/eval"
+DATA_PATH = DEFAULT_IMG_PATH
 N_CLASSES = 25
 
 # (FROM RASTA) extended from evaluation.py to include additional statistics and evaluation tools
@@ -66,7 +65,6 @@ def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_si
 
     outputs = [layer.output for layer in model.layers]
     outputs = outputs[1:]
-    print("number of layers", len(model.layers))
     act_model = Model(inputs=model.input, outputs=outputs)
     img = load_img(img_path, target_size=target_size)
     x = img_to_array(img)
@@ -85,7 +83,6 @@ def get_act_map(model_path, img_path, target_size, layer_no, save, show, plot_si
         for idx, layer in enumerate(model.layers):
             if layer.name == layer_no:
                 index = idx
-                print("layer name: ", layer_no, ", with index: ", index)
                 break
     act = activations[index]
     i = 0
@@ -190,7 +187,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     cm = confusion_matrix(y_true, y_pred)
     orig_cm = cm
     if show:
-        plt.figure(figsize=(18, 18))
+        plt.figure(figsize=(18, 25))
     if normalise:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         fmt = '.2f'
@@ -200,7 +197,7 @@ def get_confusion_matrix(y_true, y_pred, show, normalise=True, save=False, **kwa
     plt.title("Confusion matrix")
     classNames = [str(x) for x in list(dico.keys())]
     cm = pd.DataFrame(cm, columns=classNames, index=classNames)
-    sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues', linewidths=.5)
+    sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues')
     #sns.heatmap(cm, cmap="YlGnBu", xticklabels=False, yticklabels=False)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
@@ -417,24 +414,16 @@ def get_classification_report(y_true, y_pred, labels, name, title, show=True, sa
     ddlheatmap = colors.ListedColormap(ddl_heat)
     title = title or 'Classification report'
     cr = classification_report(y_true, y_pred, target_names=labels)
-    print(cr)
     lines = cr.split('\n')
     classes = []
     matrix = []
-    print(lines)
-    print("get lines")
     for line in lines[2:(len(lines) - 5)]:
-        print(line)
         s = line.split()
-        print("s: ", s)
         classes.append(s[0])
         value = [float(x) for x in s[1: len(s) - 1]]
         matrix.append(value)
 
-    plt.figure(figsize=(20, 16))
-    # fig, ax = plt.subplots(1, squeeze=False)
-    print("len of matrix: ", len(matrix))
-    print("len of classes: ", len(classes))
+    plt.figure(figsize=(18, 23))
     matrix = pd.DataFrame(matrix, columns=['precision', 'recall', 'f1-score'], index=classes)
     ax = sns.heatmap(matrix, annot=True, fmt='.2f', cmap='Blues')
 
@@ -451,85 +440,6 @@ def get_classification_report(y_true, y_pred, labels, name, title, show=True, sa
     if show:
 
         plt.show()
-
-
-    # from https://medium.com/district-data-labs/visual-diagnostics-for-more-informed-machine-learning-7ec92960c96b
-
-def plot_history_hover(history, type, add_title=True, show_up=True, save=False, **kwargs):
-    from collections import defaultdict
-
-    import numpy as np
-    from scipy.stats import norm
-
-    from bokeh.plotting import show, figure
-    from bokeh.models import ColumnDataSource, HoverTool, Title
-    from bokeh.palettes import Viridis6
-    from bokeh.models.tools import CustomJSHover
-    if type == 'Loss':
-        list1 = ['%.3f' % elem for elem in history['loss']]
-        list2 = [ '%.3f' % elem for elem in history['val_loss']]
-    else:
-        list1 = [ '%.3f' % elem for elem in history['acc']]
-        list2 = [ '%.3f' % elem for elem in history['val_acc']]
-    if len(list1) == 0 and type == 'Loss':
-        print('Loss is missing in history')
-        return
-    else:
-        print("length: ", len(list1))
-        ## As loss always exists
-
-    epochs = np.array(list(range(1, len(list1) + 1)))
-    print(epochs)
-    if save:
-        if 'path' in kwargs:
-            path = kwargs['path']
-        if 'name' in kwargs:
-            name = kwargs['name']
-        output_file(join(path, name+'.html'))
-
-    data = defaultdict(list)
-    for t, val in zip(['Train', 'Val'], [list1, list2]):#[(1.0, 83), (0.9, 55), (0.6, 98), (0.4, 43), (0.2, 39), (0.12, 29)]:
-        data["Epochs"].append(epochs)
-        data[type].append(val)
-        data['Type'].append(t)
-    data['color'] = Viridis6
-
-    source = ColumnDataSource(data)
-
-    p = figure(plot_height=400, x_axis_label='Epochs', y_axis_label=type)
-    p.multi_line(xs='Epochs', ys=type, legend="Type",
-                 line_width=5, line_color='color', line_alpha=0.6,
-                 hover_line_color='color', hover_line_alpha=1.0,
-                 source=source)
-
-    '''p.add_tools(HoverTool(show_arrow=False, line_policy='next', tooltips=[
-        ('Loss', '@Loss')
-    ]))'''
-    e = CustomJSHover(code="""
-        return '' + special_vars.data_x
-    """)
-
-    l = CustomJSHover(code="""
-        return '' + special_vars.data_y
-    """)
-
-    p.add_tools(
-        HoverTool(
-            show_arrow=False,
-            line_policy='next',
-            tooltips=[
-                ('Epochs', '@Epochs{custom}'),  # or just ('X_value', '$data_x')
-                (type, '@'+type+'{custom}')
-            ],
-            formatters={'Epochs': e, type:l}
-        )
-    )
-    if add_title:
-        p.add_layout(Title(text='Training History Plot', text_font_style="italic"), 'above')
-        p.add_layout(Title(text=name, text_font_size="16pt"), 'above')
-
-    if show_up:
-        show(p)
 
 #https://plot.ly/python/line-charts/
 def plot_history_plotly(history, type, name, path=None, save=False, show=False):
@@ -649,13 +559,10 @@ def write_to_csv(path, data, type):
 # main method decoding user command line options and use respective method calls
 # in the case of -t acc or pred only
 def evaluate():
-    if args.model_path is None:
-        if args.model_type is None or args.model_type=='resnet':
-            MODEL_PATH = DEFAULT_MODEL_PATH
-        elif args.model_type=='vgg':
+    MODEL_PATH = args.model_path
+    if args.model_type is not None:
+        if args.model_type=='vgg':
             MODEL_PATH = VGG_MODEL_PATH
-    else:
-        MODEL_PATH = args.model_path
     PRE_PATH = ''
     k = (str(args.top_k)).split(",")
     K = [int(val) for val in k]
@@ -694,9 +601,8 @@ def evaluate():
             csv_path = args.cv
             dic = {(key, value) for (key, value) in zip(k, acc)}
             write_to_csv(csv_path, dic,'cv')
-
-
     else:
+        DATA_PATH = args.data_path
         if args.data_path is None:
             DATA_PATH = DEFAULT_IMG_PATH
         v = 5
@@ -708,7 +614,6 @@ def evaluate():
         else:
             print("Top-{} prediction : {}".format(k, pred))
 
-
 his_type = {
     'a': 'Accuracy',
     'l': 'Loss'
@@ -716,6 +621,11 @@ his_type = {
 
 # method for any options to plot history or generating activation maps
 def plot():
+    if args.model_name is None:
+        if args.model_type is not None:
+            args.model_name = args.model_type
+        else: args.model_name = ""
+
     if args.plot_his is not None:
         his_t = args.plot_his
         his = pickle.load(open(args.file, 'rb'))
@@ -726,10 +636,14 @@ def plot():
             his_t = 'l'
             plot_history_plotly(his, his_type[his_t], save=args.save, path=args.save_path, name=args.model_name + "-" + his_type[his_t] + " Plot", show=args.show_g)
     elif args.act is not None:
-        MODEL_PATH = args.model_path
+        if args.model_type is not None:
+            if args.model_type=='vgg':
+                MODEL_PATH = VGG_MODEL_PATH
+        else:
+            MODEL_PATH = args.model_path
         DATA_PATH = args.data_path
         if DATA_PATH is None:
-            DATA_PATH = IMG_PATH
+            DATA_PATH = DEFAULT_IMG_PATH
         layer_no = args.act
         get_act_map(MODEL_PATH, DATA_PATH, (224, 224), layer_no=layer_no, save=args.save, path=args.save_path, name=args.model_name + "-" + layer_no + "-act-map", show=args.show_g)
 
