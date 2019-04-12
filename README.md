@@ -1,6 +1,8 @@
 # Fine-art Paintings Classification with Transfer Learning
 
 ### To set up the environment
+From root directory, run:
+
     ./build.sh
     source venv/bin/activate
 To be run in GPU supported Scientific Linux lab clients.
@@ -23,7 +25,7 @@ Testing takes around 8-10 minutes from the lab machine.
 ````
 
 ### Model Evaluation
-For quick run of all tests below, use:
+For quick run of all tests below, from root directory run:
 ````
     ./test.sh
 ````
