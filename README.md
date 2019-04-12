@@ -32,6 +32,8 @@ For quick run of all tests below, from root directory run:
 
 This will evaluate the model accuracy on small test set with confusion matrices and classification report, make prediction on an image, plot history and activation maps.
 
+Any plots/files generated to be saved from execution will be saved in models/eval as the default save path.
+
 N/B Please ensure tkinter is available for plot generation.
 
 #### Evaluate the accuracy of model on small test set
@@ -171,6 +173,10 @@ optimiser with factor of 10 decay, with batch size 60 and epoch 10.
 
         python3 train.py -t retrain -m models/resnet50_model/resnet50_06-0.517-2.090.hdf5 -e 10 -b 60 -n 110-120 -lr 0.00001 --decay rate
 
+Tune the model by initialising a new model instance, pretrained with replaced random top layers, and copying the weights from layers indexed 12-20 from the given model.
+New models to have top 3 layers as trainable with constant learning rate of 0.00001, batch size of 30 and epoch 10
+
+        python3 train.py -t tune -m models/vgg16_model/vgg16_01-0.520-1.567.hdf5 -e 10 -b 30 -tr 1 -ln 12-20 -n 3 -lr 0.00001
 
 To view tensorboard for monitoring the training process use:
 
