@@ -233,7 +233,17 @@ which should be created using read_images - get_small_from_dataset
 
 ### More Training - GridSearch
 #### GridSearch on different parameter combination
+Example json files are saved under data/<\*.json>.
+
+General run:
+
     python3 train_hyp.py -t params [-j <json_file>] [-s]
+
+Example run:
+Note: according to the number of combinations, one test execution may run 10-15 hours.
+
+    python3 train_hyp.py -t params -j data/\_param.json -s
+
 #### Train one model config via CV
     python3 train_hyp.py -t cv -cv <k> [-s] -m <model_name>
 
