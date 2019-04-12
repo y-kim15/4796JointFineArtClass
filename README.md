@@ -9,7 +9,7 @@ To be run in GPU supported Scientific Linux lab clients.
 Note that this automatically installs tensorflow-gpu
 
 ### To download image files
-Image files for training was downloaded from Lecoutre et al. source of [RASTA](https://github.com/bnegreve/rasta) where full credits are given as stated in the report,
+Image files for training was downloaded from Lecoutre *et al.* source of [RASTA](https://github.com/bnegreve/rasta) where full credits are given as stated in the report,
 that the project has taken the existing work as a basis to extend on.
 
 The full dataset can be downloaded using the below command. Note it has a total size of 18GB so would recommend to store in the scratch space.
