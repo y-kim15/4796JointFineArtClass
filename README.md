@@ -47,17 +47,17 @@ Categorical accuracy for Small *wikipaintings_test* set:
 
 | small | ResNet50 | VGG16 |
 |-------|----------|-------|
-| Top-1 | 40.8     | 39.6  |
-| Top-3 | 66.0     | 68.4  |
-| Top-5 | 82.0     | 81.6  |
+| Top-1 | **40.8**     | 39.6  |
+| Top-3 | **66.0**     | 68.4  |
+| Top-5 | **82.0**     | 81.6  |
 
 Categorical accuracy for Large *wikipaintings_test* set:
 
 | full  | ResNet50 | VGG16 |
 |-------|----------|-------|
-| Top-1 | 49.1     | 50.3  |
-| Top-3 | 75.4     | 78.4  |
-| Top-5 | 86.3     | 88.3  |
+| Top-1 | 49.1     | **50.3**  |
+| Top-3 | 75.4     | **78.4**  |
+| Top-5 | 86.3     | **88.3**  |
 
 
     python3 evaluate_result.py -t acc -m <model_path> [-cm --report --roc --show] -s
