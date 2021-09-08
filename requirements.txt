@@ -34,7 +34,7 @@ opencv-python==3.4.3.18
 packaging==19.0
 pandas==0.22.0
 pbr==5.1.2
-Pillow==8.1.1
+Pillow==8.3.2
 plotly==3.7.1
 progressbar2==3.39.2
 protobuf==3.6.1
